@@ -120,6 +120,7 @@
     <Compile Include="Helpers\ProcessContext.cs" />
     <Compile Include="Helpers\YamlConverters.cs" />
     <Compile Include="Interfaces\IUpdatable.cs" />
+    <Compile Include="Api.cs" />
     <Compile Include="Overlay.cs" />
     <Compile Include="Helpers\Extensions.cs" />
     <Compile Include="Helpers\PointOfInterestHandler.cs" />

@@ -41,6 +41,8 @@ namespace MapAssist
         private static NotifyIcon trayIcon;
         private static Overlay overlay;
         private static BackgroundWorker backWorkOverlay = new BackgroundWorker();
+        private static Api api;
+        private static BackgroundWorker backWorkerApi = new BackgroundWorker();
         private static IKeyboardMouseEvents globalHook = Hook.GlobalEvents();
         private static readonly Logger _log = LogManager.GetCurrentClassLogger(); 
 
@@ -138,6 +140,10 @@ namespace MapAssist
                     backWorkOverlay.WorkerSupportsCancellation = true;
                     backWorkOverlay.RunWorkerAsync();
 
+                    backWorkerApi.DoWork += new DoWorkEventHandler(RunApi);
+                    backWorkerApi.WorkerSupportsCancellation = true;
+                    backWorkerApi.RunWorkerAsync();
+
                     GameManager.OnGameAccessDenied += (_, __) =>
                     {
                         var message = $"MapAssist could not read {GameManager.ProcessName} memory. Please reopen MapAssist as an administrator.";
@@ -165,6 +171,14 @@ namespace MapAssist
                 overlay.Run();
             }
         }
+        public static void RunApi(object sender, DoWorkEventArgs e)
+        {
+            using (api = new Api())
+            {
+                api.runServer();
+            }
+        }
+
 
         private static void ProcessException(Exception e)
         {
