@@ -71,7 +71,7 @@ namespace MapAssist
                 Console.WriteLine();
 
                 // If `shutdown` url requested w/ POST, then shutdown the server after serving the page
-                var jsonData = "{\"test\": \"reached\"}";
+                var jsonData = "{\"success\": \"false\"}";
                 if ((req.HttpMethod == "POST") && (req.Url.AbsolutePath == "/get_data"))
                 {
                     if (disposed) return;
@@ -84,8 +84,10 @@ namespace MapAssist
                             {
                                 var msg = new
                                 {
+                                    success = true,
                                     monsters = new List<dynamic>(),
                                     points_of_interest = new List<dynamic>(),
+                                    npcs = new Dictionary<string, dynamic>(),
                                     player_pos = _gameData.PlayerPosition,
                                     collision_grid = _compositor._areaData.CollisionGrid,
                                 };
@@ -108,6 +110,11 @@ namespace MapAssist
                                         type = p.Type,
                                         label = p.Label
                                     });
+                                }
+
+                                foreach (var npc in _compositor._areaData.NPCs)
+                                {
+                                    msg.npcs.Add(npc.Key.ToString(), npc.Value);
                                 }
 
                                 jsonData = JsonConvert.SerializeObject(msg);
