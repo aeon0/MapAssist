@@ -86,7 +86,7 @@ namespace MapAssist
                                 {
                                     monsters = new List<dynamic>(),
                                     points_of_interest = new List<dynamic>(),
-                                    player_pos = _gameData.PlayerPosition
+                                    player_pos = _gameData.PlayerPosition,
                                     collision_grid = _compositor._areaData.CollisionGrid,
                                 };
 
