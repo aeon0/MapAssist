@@ -39,7 +39,7 @@ namespace MapAssist.Helpers
 
         public GameData _gameData;
         public readonly AreaData _areaData;
-        private readonly IReadOnlyList<PointOfInterest> _pointsOfInterest;
+        public readonly IReadOnlyList<PointOfInterest> _pointsOfInterest;
         ExocetFont _exocetFont;
 
         private Matrix3x2 mapTransformMatrix;

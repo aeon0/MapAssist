@@ -84,17 +84,29 @@ namespace MapAssist
                             {
                                 var msg = new
                                 {
-                                    monsters = new List<dynamic>()
+                                    monsters = new List<dynamic>(),
+                                    points_of_interest = new List<dynamic>(),
+                                    player_pos = _gameData.PlayerPosition
+                                    collision_grid = _compositor._areaData.CollisionGrid,
                                 };
 
                                 foreach (UnitAny m in _gameData.Monsters)
                                 {
-                                    msg.monsters.Add(new {
+                                    msg.monsters.Add(new
+                                    {
                                         position = m.Position,
-                                        position_x = m.X,
-                                        position_y = m.Y,
                                         immunities = m.Immunities,
                                         unit_type = m.UnitType
+                                    });
+                                }
+
+                                foreach (PointOfInterest p in _compositor._pointsOfInterest)
+                                {
+                                    msg.points_of_interest.Add(new
+                                    {
+                                        position = p.Position,
+                                        type = p.Type,
+                                        label = p.Label
                                     });
                                 }
 
