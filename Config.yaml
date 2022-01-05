@@ -19,15 +19,15 @@ HiddenAreas:
 ## RenderingConfiguration - Visual settings for the overlay
 RenderingConfiguration:
   ## Opacity - Map transparency %
-  Opacity: 0.5
+  Opacity: 1.0
   ## Opacity - Icon transparency %
   IconOpacity: 0.9
   ## OverlayMode - Overlay map over in-game map / can be hidden with hotkey (ToggleKey)
-  OverlayMode: true
+  OverlayMode: false
   ## Positions - Options are: Center, TopLeft, TopRight
   Position: Center
   ## ToggleViaInGameMap - Auto-hide map overlay when the in-game map is hidden
-  ToggleViaInGameMap: false
+  ToggleViaInGameMap: true
   ## ToggleViaInGamePanels - Auto-hide overlay when in-game panels/menus are opened
   ToggleViaInGamePanels: true
   ## Size - Overlay map maximum size
@@ -191,11 +191,11 @@ MapColorConfiguration:
 ## GameInfo - Display setting for game info
 GameInfo:
   ## ShowGameIP - Display game server IP address
-  ShowGameIP: true
+  ShowGameIP: false
   ## HuntingIP - Set an IP address to display in green instead of red
   HuntingIP: 'x.x.x.x'
   ## ShowAreaLevel - Display current area and alvl
-  ShowAreaLevel: true
+  ShowAreaLevel: false
   ## ShowOverlayFPS - Developer setting, probably not useful
   ShowOverlayFPS: false
   LabelFont: "Exocet Blizzard Mixed Caps"
