@@ -89,6 +89,7 @@ namespace MapAssist
                                     points_of_interest = new List<dynamic>(),
                                     npcs = new Dictionary<string, dynamic>(),
                                     player_pos = _gameData.PlayerPosition,
+                                    area_origin = _compositor._areaData.Origin,
                                     collision_grid = _compositor._areaData.CollisionGrid,
                                 };
 
