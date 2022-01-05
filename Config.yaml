@@ -191,7 +191,7 @@ MapColorConfiguration:
 ## GameInfo - Display setting for game info
 GameInfo:
   ## ShowGameIP - Display game server IP address
-  ShowGameIP: false
+  ShowGameIP: true
   ## HuntingIP - Set an IP address to display in green instead of red
   HuntingIP: 'x.x.x.x'
   ## ShowAreaLevel - Display current area and alvl

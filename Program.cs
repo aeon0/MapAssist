@@ -39,8 +39,8 @@ namespace MapAssist
         private static Mutex mutex = null; 
         
         private static NotifyIcon trayIcon;
-        private static Overlay overlay;
-        private static BackgroundWorker backWorkOverlay = new BackgroundWorker();
+        //private static Overlay overlay;
+        //private static BackgroundWorker backWorkOverlay = new BackgroundWorker();
         private static Api api;
         private static BackgroundWorker backWorkerApi = new BackgroundWorker();
         private static IKeyboardMouseEvents globalHook = Hook.GlobalEvents();
@@ -128,17 +128,17 @@ namespace MapAssist
                         Visible = true
                     };
 
-                    globalHook.KeyPress += (sender, args) =>
-                    {
-                        if (overlay != null)
-                        {
-                            overlay.KeyPressHandler(sender, args);
-                        }
-                    };
+                    //globalHook.KeyPress += (sender, args) =>
+                    //{
+                    //    if (overlay != null)
+                    //    {
+                    //        overlay.KeyPressHandler(sender, args);
+                    //    }
+                    //};
                     
-                    backWorkOverlay.DoWork += new DoWorkEventHandler(RunOverlay);
-                    backWorkOverlay.WorkerSupportsCancellation = true;
-                    backWorkOverlay.RunWorkerAsync();
+                    //backWorkOverlay.DoWork += new DoWorkEventHandler(RunOverlay);
+                    //backWorkOverlay.WorkerSupportsCancellation = true;
+                    //backWorkOverlay.RunWorkerAsync();
 
                     backWorkerApi.DoWork += new DoWorkEventHandler(RunApi);
                     backWorkerApi.WorkerSupportsCancellation = true;
@@ -164,13 +164,13 @@ namespace MapAssist
             }
         }
 
-        public static void RunOverlay(object sender, DoWorkEventArgs e)
-        {
-            using (overlay = new Overlay())
-            {
-                overlay.Run();
-            }
-        }
+        //public static void RunOverlay(object sender, DoWorkEventArgs e)
+        //{
+        //    using (overlay = new Overlay())
+        //    {
+        //        overlay.Run();
+        //    }
+        //}
         public static void RunApi(object sender, DoWorkEventArgs e)
         {
             using (api = new Api())
@@ -305,12 +305,17 @@ namespace MapAssist
             GameManager.Dispose();
             MapApi.Dispose();
             globalHook.Dispose();
-            overlay.Dispose();
+            // overlay.Dispose();
             trayIcon.Dispose();
+            api.Dispose();
 
-            if (backWorkOverlay.IsBusy)
+            //if (backWorkOverlay.IsBusy)
+            //{
+            //    backWorkOverlay.CancelAsync();
+            //}
+            if (backWorkerApi.IsBusy)
             {
-                backWorkOverlay.CancelAsync();
+                backWorkerApi.CancelAsync();
             }
 
             mutex.Dispose();
