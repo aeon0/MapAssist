@@ -87,20 +87,30 @@ namespace MapAssist
                                     success = true,
                                     monsters = new List<dynamic>(),
                                     points_of_interest = new List<dynamic>(),
-                                    npcs = new Dictionary<string, dynamic>(),
                                     player_pos = _gameData.PlayerPosition,
                                     area_origin = _compositor._areaData.Origin,
                                     collision_grid = _compositor._areaData.CollisionGrid,
+                                    current_area = _compositor._areaData.Area.ToString()
                                 };
 
                                 foreach (UnitAny m in _gameData.Monsters)
                                 {
-                                    msg.monsters.Add(new
+                                    if (m.UnitType == UnitType.Monster)
                                     {
-                                        position = m.Position,
-                                        immunities = m.Immunities,
-                                        unit_type = m.UnitType
-                                    });
+                                        using (var processContext = GameManager.GetProcessContext())
+                                        {
+                                            var stats = processContext.Read<MapAssist.Structs.MonStats>(m.MonsterData.pMonStats);
+                                            msg.monsters.Add(new
+                                            {
+                                                position = m.Position,
+                                                immunities = m.Immunities,
+                                                unit_type = m.UnitType.ToString(),
+                                                type = m.MonsterData.MonsterType.ToString(),
+                                                id = m.UnitId,
+                                                name = stats.Name
+                                            });
+                                        }
+                                    }
                                 }
 
                                 foreach (PointOfInterest p in _compositor._pointsOfInterest)
@@ -111,11 +121,6 @@ namespace MapAssist
                                         type = p.Type,
                                         label = p.Label
                                     });
-                                }
-
-                                foreach (var npc in _compositor._areaData.NPCs)
-                                {
-                                    msg.npcs.Add(npc.Key.ToString(), npc.Value);
                                 }
 
                                 jsonData = JsonConvert.SerializeObject(msg);
