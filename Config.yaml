@@ -176,7 +176,7 @@ ItemLog:
   Enabled: true
   FilterFileName: "ItemFilter.yaml"
   ## PlaySoundOnDrop - Play drop sound
-  PlaySoundOnDrop: true
+  PlaySoundOnDrop: false
   ## SoundFile - Name of .wav file for drop sound (put .wav file in the MapAssist folder)
   SoundFile: ""
   DisplayForSeconds: 45

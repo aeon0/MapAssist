@@ -86,6 +86,8 @@ namespace MapAssist
                                 {
                                     success = true,
                                     monsters = new List<dynamic>(),
+                                    objects = new List<dynamic>(),
+                                    items = new List<dynamic>(),
                                     points_of_interest = new List<dynamic>(),
                                     player_pos = _gameData.PlayerPosition,
                                     area_origin = _compositor._areaData.Origin,
@@ -97,19 +99,19 @@ namespace MapAssist
                                 {
                                     if (m.UnitType == UnitType.Monster)
                                     {
-                                        using (var processContext = GameManager.GetProcessContext())
+                                        //using (var processContext = GameManager.GetProcessContext())
+                                        //{
+                                        //    var stats = processContext.Read<MapAssist.Structs.MonStats>(m.MonsterData.pMonStats);
+                                        //}
+                                        msg.monsters.Add(new
                                         {
-                                            var stats = processContext.Read<MapAssist.Structs.MonStats>(m.MonsterData.pMonStats);
-                                            msg.monsters.Add(new
-                                            {
-                                                position = m.Position,
-                                                immunities = m.Immunities,
-                                                unit_type = m.UnitType.ToString(),
-                                                type = m.MonsterData.MonsterType.ToString(),
-                                                id = m.UnitId,
-                                                name = stats.Name
-                                            });
-                                        }
+                                            position = m.Position,
+                                            immunities = m.Immunities,
+                                            unit_type = m.UnitType.ToString(),
+                                            type = m.MonsterData.MonsterType.ToString(),
+                                            id = m.UnitId,
+                                            name = ((Npc)m.TxtFileNo).ToString()
+                                        });
                                     }
                                 }
 
@@ -121,6 +123,35 @@ namespace MapAssist
                                         type = p.Type,
                                         label = p.Label
                                     });
+                                }
+
+                                foreach (UnitAny o in _gameData.Objects)
+                                {
+                                    if (o.UnitType == UnitType.Object)
+                                    {
+                                        msg.objects.Add(new
+                                        {
+                                            position = o.Position,
+                                            id = o.UnitId,
+                                            selectable = o.ObjectData.InteractType != 0x00,
+                                            name = ((GameObject)o.TxtFileNo).ToString()
+                                        });
+                                    }
+                                }
+
+                                foreach (UnitAny i in _gameData.Items)
+                                {
+                                    if (i.UnitType == UnitType.Item)
+                                    {
+                                        msg.items.Add(new
+                                        {
+                                            position = i.Position,
+                                            id = i.UnitId,
+                                            flags = i.ItemData.ItemFlags,
+                                            quality = i.ItemData.ItemQuality,
+                                            name = Items.ItemName(i.TxtFileNo)
+                                        });
+                                    }
                                 }
 
                                 jsonData = JsonConvert.SerializeObject(msg);
