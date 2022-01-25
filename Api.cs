@@ -110,7 +110,8 @@ namespace MapAssist
                                             unit_type = m.UnitType.ToString(),
                                             type = m.MonsterData.MonsterType.ToString(),
                                             id = m.UnitId,
-                                            name = ((Npc)m.TxtFileNo).ToString()
+                                            name = ((Npc)m.TxtFileNo).ToString(),
+                                            mode = m.Mode
                                         });
                                     }
                                 }
