@@ -63,12 +63,12 @@ namespace MapAssist
                 HttpListenerResponse resp = ctx.Response;
 
                 // Print out some info about the request
-                Console.WriteLine("Request #: {0}", ++requestCount);
-                Console.WriteLine(req.Url.ToString());
-                Console.WriteLine(req.HttpMethod);
-                Console.WriteLine(req.UserHostName);
-                Console.WriteLine(req.UserAgent);
-                Console.WriteLine();
+                //Console.WriteLine("Request #: {0}", ++requestCount);
+                //Console.WriteLine(req.Url.ToString());
+                //Console.WriteLine(req.HttpMethod);
+                //Console.WriteLine(req.UserHostName);
+                //Console.WriteLine(req.UserAgent);
+                //Console.WriteLine();
 
                 // If `shutdown` url requested w/ POST, then shutdown the server after serving the page
                 var jsonData = "{\"success\": \"false\"}";
