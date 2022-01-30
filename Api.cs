@@ -63,12 +63,12 @@ namespace MapAssist
                 HttpListenerResponse resp = ctx.Response;
 
                 // Print out some info about the request
-                Console.WriteLine("Request #: {0}", ++requestCount);
-                Console.WriteLine(req.Url.ToString());
-                Console.WriteLine(req.HttpMethod);
-                Console.WriteLine(req.UserHostName);
-                Console.WriteLine(req.UserAgent);
-                Console.WriteLine();
+                //Console.WriteLine("Request #: {0}", ++requestCount);
+                //Console.WriteLine(req.Url.ToString());
+                //Console.WriteLine(req.HttpMethod);
+                //Console.WriteLine(req.UserHostName);
+                //Console.WriteLine(req.UserAgent);
+                //Console.WriteLine();
 
                 // If `shutdown` url requested w/ POST, then shutdown the server after serving the page
                 var jsonData = "{\"success\": \"false\"}";
@@ -92,7 +92,10 @@ namespace MapAssist
                                     player_pos = _gameData.PlayerPosition,
                                     area_origin = _compositor._areaData.Origin,
                                     collision_grid = _compositor._areaData.CollisionGrid,
-                                    current_area = _compositor._areaData.Area.ToString()
+                                    current_area = _compositor._areaData.Area.ToString(),
+                                    used_skill = _gameData.PlayerUnit.Skill.UsedSkillId,
+                                    left_skill = _gameData.PlayerUnit.Skill.LeftSkillId,
+                                    right_skill = _gameData.PlayerUnit.Skill.RightSkillId
                                 };
 
                                 foreach (UnitAny m in _gameData.Monsters)
@@ -110,7 +113,8 @@ namespace MapAssist
                                             unit_type = m.UnitType.ToString(),
                                             type = m.MonsterData.MonsterType.ToString(),
                                             id = m.UnitId,
-                                            name = ((Npc)m.TxtFileNo).ToString()
+                                            name = ((Npc)m.TxtFileNo).ToString(),
+                                            mode = m.Mode
                                         });
                                     }
                                 }

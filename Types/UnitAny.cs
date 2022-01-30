@@ -307,7 +307,7 @@ namespace MapAssist.Types
             else
             {
                 if (_unitAny.UnitType != UnitType.Monster) return false;
-                if (_unitAny.Mode == 0 || _unitAny.Mode == 12) return false;
+                if (_unitAny.Mode == 0) return false;
                 if (NPC.Dummies.TryGetValue(_unitAny.TxtFileNo, out var _)) { return false; }
 
                 _isMonster = true;
