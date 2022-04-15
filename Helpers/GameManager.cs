@@ -17,11 +17,12 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  **/
 
+using MapAssist.Settings;
+using MapAssist.Structs;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
-using MapAssist.Structs;
 
 namespace MapAssist.Helpers
 {
@@ -38,20 +39,19 @@ namespace MapAssist.Helpers
         private static ProcessContext _processContext;
 
         public delegate void StatusUpdateHandler(object sender, EventArgs e);
+
         public static event StatusUpdateHandler OnGameAccessDenied;
 
-        private static Types.UnitAny _PlayerUnit = default;
         private static IntPtr _UnitHashTableOffset;
         private static IntPtr _ExpansionCheckOffset;
-        private static IntPtr _GameIPOffset;
+        private static IntPtr _GameNameOffset;
         private static IntPtr _MenuPanelOpenOffset;
         private static IntPtr _MenuDataOffset;
         private static IntPtr _RosterDataOffset;
+        private static IntPtr _InteractedNpcOffset;
+        private static IntPtr _LastHoverDataOffset;
 
         private static WindowsExternal.WinEventDelegate _eventDelegate = null;
-
-        private static bool _playerNotFoundErrorThrown = false;
-        public static bool PlayerFound = false;
 
         public static void MonitorForegroundWindow()
         {
@@ -106,7 +106,6 @@ namespace MapAssist.Helpers
 
             // is a new game process
             _log.Info($"Active window changed to a game window (handle: {hwnd})");
-            ResetPlayerUnit();
 
             try
             {
@@ -148,6 +147,8 @@ namespace MapAssist.Helpers
 
         private static void ClearLastGameProcess()
         {
+            if (MapAssistConfiguration.Loaded.RenderingConfiguration.StickToLastGameWindow) return;
+
             if (_processContext != null && _processContext.OpenContextCount == 0 && _lastGameProcess != null) // Prevent disposing the process when the context is open
             {
                 _lastGameProcess.Dispose();
@@ -161,55 +162,12 @@ namespace MapAssist.Helpers
         public static IntPtr MainWindowHandle { get => _lastGameHwnd; }
         public static bool IsGameInForeground { get => _lastGameProcessId == _foregroundProcessId; }
 
-        public static Types.UnitAny PlayerUnit
-        {
-            get
-            {
-                if (Equals(_PlayerUnit, default(Types.UnitAny)))
-                {
-                    foreach (var pUnitAny in UnitHashTable().UnitTable)
-                    {
-                        var unitAny = new Types.UnitAny(pUnitAny);
-
-                        while (unitAny.IsValidUnit())
-                        {
-                            if (unitAny.IsPlayerUnit())
-                            {
-                                _playerNotFoundErrorThrown = false;
-                                _PlayerUnit = unitAny;
-                                return _PlayerUnit;
-                            }
-
-                            unitAny = unitAny.ListNext(null);
-                        }
-                    }
-                }
-                else
-                {
-                    _playerNotFoundErrorThrown = false;
-                    PlayerFound = true;
-                    return _PlayerUnit;
-                }
-
-                if (!_playerNotFoundErrorThrown)
-                {
-                    _playerNotFoundErrorThrown = true;
-                    throw new Exception("Player unit not found.");
-                }
-                else
-                {
-                    return default(Types.UnitAny);
-                }
-            }
-        }
-
         public static UnitHashTable UnitHashTable(int offset = 0)
         {
             using (var processContext = GetProcessContext())
             {
                 if (_UnitHashTableOffset == IntPtr.Zero)
                 {
-
                     _UnitHashTableOffset = processContext.GetUnitHashtableOffset();
                 }
 
@@ -234,24 +192,25 @@ namespace MapAssist.Helpers
                 return _ExpansionCheckOffset;
             }
         }
-        public static IntPtr GameIPOffset
+
+        public static IntPtr GameNameOffset
         {
             get
             {
-                if (_GameIPOffset != IntPtr.Zero)
+                if (_GameNameOffset != IntPtr.Zero)
                 {
-                    return _GameIPOffset;
+                    return _GameNameOffset;
                 }
 
                 using (var processContext = GetProcessContext())
                 {
-                    _GameIPOffset = (IntPtr)processContext.GetGameIPOffset();
-
+                    _GameNameOffset = (IntPtr)processContext.GetGameNameOffset();
                 }
 
-                return _GameIPOffset;
+                return _GameNameOffset;
             }
         }
+
         public static IntPtr MenuOpenOffset
         {
             get
@@ -269,6 +228,7 @@ namespace MapAssist.Helpers
                 return _MenuPanelOpenOffset;
             }
         }
+
         public static IntPtr MenuDataOffset
         {
             get
@@ -286,6 +246,7 @@ namespace MapAssist.Helpers
                 return _MenuDataOffset;
             }
         }
+
         public static IntPtr RosterDataOffset
         {
             get
@@ -304,21 +265,42 @@ namespace MapAssist.Helpers
             }
         }
 
-        public static void ResetPlayerUnit()
+        public static IntPtr LastHoverDataOffset
         {
-            _PlayerUnit = default;
-            PlayerFound = false;
-            using (var processContext = GetProcessContext())
+            get
             {
-                if (processContext == null) { return; }
-                var processId = processContext.ProcessId;
-                if(GameMemory.PlayerUnits.TryGetValue(processId, out var playerUnit))
+                if (_LastHoverDataOffset != IntPtr.Zero)
                 {
-                    GameMemory.PlayerUnits[processId] = default;
+                    return _LastHoverDataOffset;
                 }
+
+                using (var processContext = GetProcessContext())
+                {
+                    _LastHoverDataOffset = processContext.GetLastHoverObjectOffset();
+                }
+
+                return _LastHoverDataOffset;
             }
         }
-        
+
+        public static IntPtr InteractedNpcOffset
+        {
+            get
+            {
+                if (_InteractedNpcOffset != IntPtr.Zero)
+                {
+                    return _InteractedNpcOffset;
+                }
+
+                using (var processContext = GetProcessContext())
+                {
+                    _InteractedNpcOffset = processContext.GetInteractedNpcOffset();
+                }
+
+                return _InteractedNpcOffset;
+            }
+        }
+
         public static void Dispose()
         {
             if (_lastGameProcess != null)

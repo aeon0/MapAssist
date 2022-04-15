@@ -17,7 +17,6 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  **/
 
-using System;
 using System.Runtime.InteropServices;
 
 namespace MapAssist.Structs
@@ -25,21 +24,14 @@ namespace MapAssist.Structs
     [StructLayout(LayoutKind.Explicit)]
     public struct Session
     {
-        [FieldOffset(0x0)] public IntPtr SessionID; //SessionID = 33 bytes
-        [FieldOffset(0x38)] public byte GameNameLength;
+        [FieldOffset(0x30)] public byte GameNameLength;
+
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 0x10)]
-        [FieldOffset(0x48)] public byte[] GameName;
-        [FieldOffset(0x68)] public byte GamePassLength;
+        [FieldOffset(0x40)] public byte[] GameName;
+
+        [FieldOffset(0x88)] public byte GamePassLength;
+
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 0x10)]
-        [FieldOffset(0x78)] public byte[] GamePass;
-        [FieldOffset(0x98)] public byte RegionLength;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 0x10)]
-        [FieldOffset(0xA8)] public byte[] Region;
-        [FieldOffset(0x1C0)] public byte GameIPLength;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 0x10)]
-        [FieldOffset(0x1D0)] public byte[] GameIP;
-        [FieldOffset(0xACD0)] public byte CharNameLength;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 0x10)]
-        [FieldOffset(0xACE0)] public byte[] CharName;
+        [FieldOffset(0x98)] public byte[] GamePass;
     }
 }

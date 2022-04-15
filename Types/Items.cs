@@ -1,172 +1,364 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Reflection;
-using System.Timers;
+/**
+ *   Copyright (C) 2021 okaygo
+ *
+ *   https://github.com/misterokaygo/MapAssist/
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ **/
+
 using MapAssist.Helpers;
 using MapAssist.Settings;
-using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using YamlDotNet.Serialization;
 
 namespace MapAssist.Types
 {
-    [Flags]
-    public enum ItemFlags : uint
-    {
-        IFLAG_NEWITEM = 0x00000001,
-        IFLAG_TARGET = 0x00000002,
-        IFLAG_TARGETING = 0x00000004,
-        IFLAG_DELETED = 0x00000008,
-        IFLAG_IDENTIFIED = 0x00000010,
-        IFLAG_QUANTITY = 0x00000020,
-        IFLAG_SWITCHIN = 0x00000040,
-        IFLAG_SWITCHOUT = 0x00000080,
-        IFLAG_BROKEN = 0x00000100,
-        IFLAG_REPAIRED = 0x00000200,
-        IFLAG_UNK1 = 0x00000400,
-        IFLAG_SOCKETED = 0x00000800,
-        IFLAG_NOSELL = 0x00001000,
-        IFLAG_INSTORE = 0x00002000,
-        IFLAG_NOEQUIP = 0x00004000,
-        IFLAG_NAMED = 0x00008000,
-        IFLAG_ISEAR = 0x00010000,
-        IFLAG_STARTITEM = 0x00020000,
-        IFLAG_UNK2 = 0x00040000,
-        IFLAG_INIT = 0x00080000,
-        IFLAG_UNK3 = 0x00100000,
-        IFLAG_COMPACTSAVE = 0x00200000,
-        IFLAG_ETHEREAL = 0x00400000,
-        IFLAG_JUSTSAVED = 0x00800000,
-        IFLAG_PERSONALIZED = 0x01000000,
-        IFLAG_LOWQUALITY = 0x02000000,
-        IFLAG_RUNEWORD = 0x04000000,
-        IFLAG_ITEM = 0x08000000
-    }
-
-    public enum ItemQuality : uint
-    {
-        INFERIOR = 0x01, //0x01 Inferior
-        NORMAL = 0x02, //0x02 Normal
-        SUPERIOR = 0x03, //0x03 Superior
-        MAGIC = 0x04, //0x04 Magic
-        SET = 0x05, //0x05 Set
-        RARE = 0x06, //0x06 Rare
-        UNIQUE = 0x07, //0x07 Unique
-        CRAFT = 0x08, //0x08 Crafted
-        TEMPERED = 0x09 //0x09 Tempered
-    }
-
-    public enum InvPage : byte
-    {
-        INVENTORY = 0,
-        EQUIP = 1,
-        TRADE = 2,
-        CUBE = 3,
-        STASH = 4,
-        BELT = 5,
-        NULL = 255,
-    }
-
-    public enum StashType : byte
-    {
-        Body = 0,
-        Personal = 1,
-        Shared1 = 2,
-        Shared2 = 3,
-        Shared3 = 4,
-        Belt = 5
-    }
-
-    public enum BodyLoc : byte
-    {
-        NONE, //Not Equipped
-        HEAD, //Helm
-        NECK, //Amulet
-        TORSO, //Body Armor
-        RARM, //Right-Hand
-        LARM, //Left-Hand
-        RRIN, //Right Ring
-        LRIN, //Left Ring
-        BELT, //Belt
-        FEET, //Boots
-        GLOVES, //Gloves
-        SWRARM, //Right-Hand on Switch
-        SWLARM //Left-Hand on Switch
-    };
-
-    public enum ItemMode : uint
-    {
-        STORED, //Item is in Storage (inventory, cube, Stash?)
-        EQUIP, //Item is Equippped
-        INBELT, //Item is in Belt Rows
-        ONGROUND, //Item is on Ground
-        ONCURSOR, //Item is on Cursor
-        DROPPING, //Item is Being Dropped
-        SOCKETED //Item is Socketed in another Item
-    };
-
-    class LocalizedItemList
-    {
-        public List<LocalizedItemObj> Items = new List<LocalizedItemObj>();
-    }
-
-    class LocalizedItemObj
-    {
-        public int ID { get; set; }
-        public string Key { get; set; }
-        public string enUS { get; set; }
-    }
-
-    class Items
+    public static class Items
     {
         public static Dictionary<int, HashSet<string>> ItemUnitHashesSeen = new Dictionary<int, HashSet<string>>();
         public static Dictionary<int, HashSet<uint>> ItemUnitIdsSeen = new Dictionary<int, HashSet<uint>>();
-        public static Dictionary<int, List<UnitAny>> ItemLog = new Dictionary<int, List<UnitAny>>();
-        public static List<UnitAny> CurrentItemLog = new List<UnitAny>();
-        public static LocalizedItemList _localizedItemList;
-        public static Dictionary<string, LocalizedItemObj> LocalizedItems = new Dictionary<string, LocalizedItemObj>();
-        public static Dictionary<int, List<Timer>> ItemLogTimers = new Dictionary<int, List<Timer>>();
+        public static Dictionary<int, HashSet<uint>> ItemUnitIdsToSkip = new Dictionary<int, HashSet<uint>>();
+        public static Dictionary<int, HashSet<uint>> InventoryItemUnitIdsToSkip = new Dictionary<int, HashSet<uint>>();
+        public static Dictionary<int, Dictionary<uint, Npc>> ItemVendors = new Dictionary<int, Dictionary<uint, Npc>>();
+        public static Dictionary<int, List<ItemLogEntry>> ItemLog = new Dictionary<int, List<ItemLogEntry>>();
+        public static Dictionary<string, LocalizedObj> LocalizedItems = new Dictionary<string, LocalizedObj>();
 
-        public static void LoadLocalization()
+        public static void LogItem(UnitItem item, int processId)
         {
-            var assembly = Assembly.GetExecutingAssembly();
-            var resName = "MapAssist.Resources.items-localization.json";
-            using (Stream stream = assembly.GetManifestResourceStream(resName))
+            if (item.IsInStore)
             {
-                using (var reader = new StreamReader(stream))
-                {
-                    var jsonString = reader.ReadToEnd();
-                    _localizedItemList = JsonConvert.DeserializeObject<LocalizedItemList>(jsonString);
-                }
-
-                foreach (var item in _localizedItemList.Items)
-                {
-                    LocalizedItems.Add(item.Key, item);
-                }
+                InventoryItemUnitIdsToSkip[processId].Add(item.UnitId);
             }
+            else
+            {
+                ItemUnitHashesSeen[processId].Add(item.HashString);
+            }
+
+            if (item.IsPlayerOwned && item.IsIdentified)
+            {
+                InventoryItemUnitIdsToSkip[processId].Add(item.UnitId);
+                ItemUnitIdsToSkip[processId].Add(item.UnitId);
+            }
+
+            ItemUnitIdsSeen[processId].Add(item.UnitId);
+
+            var (logItem, rule) = LootFilter.Filter(item);
+            if (!logItem) return;
+
+            if (MapAssistConfiguration.Loaded.ItemLog.PlaySoundOnDrop && (rule == null || rule.PlaySoundOnDrop))
+            {
+                AudioPlayer.PlayItemAlert();
+            }
+
+            item.IsIdentifiedForLog = item.IsIdentified;
+
+            ItemLog[processId].Add(new ItemLogEntry()
+            {
+                Color = item.ItemBaseColor,
+                ItemHashString = item.HashString,
+                UnitItem = item,
+                Rule = rule
+            });
         }
 
-        public static string ItemName(uint txtFileNo)
+        public static bool CheckInventoryItem(UnitItem item, int processId) =>
+            MapAssistConfiguration.Loaded.ItemLog.CheckItemOnIdentify &&
+            item.IsIdentified && item.IsPlayerOwned && !item.IsInSocket &&
+            !InventoryItemUnitIdsToSkip[processId].Contains(item.UnitId);
+
+        public static bool CheckDroppedItem(UnitItem item, int processId) =>
+            !item.IsIdentified && item.IsDropped &&
+            !ItemUnitHashesSeen[processId].Contains(item.HashString) &&
+            !ItemUnitIdsSeen[processId].Contains(item.UnitId) &&
+            !ItemUnitIdsToSkip[processId].Contains(item.UnitId);
+
+        public static bool CheckVendorItem(UnitItem item, int processId) =>
+            MapAssistConfiguration.Loaded.ItemLog.CheckVendorItems &&
+            item.IsInStore &&
+            !ItemUnitIdsSeen[processId].Contains(item.UnitId) &&
+            !ItemUnitIdsToSkip[processId].Contains(item.UnitId);
+
+        public static string ItemLogDisplayName(UnitItem item, ItemFilter rule)
         {
-            string itemCode;
-            if (!_ItemCodes.TryGetValue(txtFileNo, out itemCode))
+            var statsProcessed = new List<Stats.Stat>();
+            var itemBaseName = GetItemName(item);
+            var itemSpecialName = "";
+            var itemPrefix = "";
+            var itemSuffix = "";
+
+            if (item.IsInStore && item.VendorOwner != Npc.Invalid)
+            {
+                var vendorLabel = item.VendorOwner != Npc.Unknown ? NpcExtensions.Name(item.VendorOwner) : "Vendor";
+                itemPrefix += $"[{vendorLabel}] ";
+            }
+            else if (item.IsIdentifiedForLog)
+            {
+                itemPrefix += "[Identified] ";
+            }
+
+            if (rule == null) return itemPrefix + itemBaseName;
+
+            if ((item.ItemData.ItemFlags & ItemFlags.IFLAG_ETHEREAL) == ItemFlags.IFLAG_ETHEREAL)
+            {
+                itemPrefix += "[Eth] ";
+            }
+
+            if (item.Stats.TryGetValue(Stats.Stat.NumSockets, out var numSockets))
+            {
+                itemPrefix += "[" + numSockets + " S] ";
+            }
+
+            if (item.ItemData.ItemQuality == ItemQuality.SUPERIOR)
+            {
+                itemPrefix += "Sup. ";
+            }
+
+            if (rule.AllResist != null)
+            {
+                var itemAllRes = GetItemStatResists(item, false);
+                if (itemAllRes > 0)
+                {
+                    itemSuffix += $" ({itemAllRes} all res)";
+                }
+            }
+
+            if (rule.SumResist != null)
+            {
+                var itemSumRes = GetItemStatResists(item, true);
+                if (itemSumRes > 0)
+                {
+                    itemSuffix += $" ({itemSumRes} sum res)";
+                }
+            }
+
+            if (rule.AllSkills != null)
+            {
+                var points = GetItemStat(item, Stats.Stat.AllSkills);
+                if (points > 0)
+                {
+                    itemSuffix += $" (+{points} all skills)";
+                }
+                statsProcessed.Add(Stats.Stat.AllSkills);
+            }
+
+            if (rule.ClassSkills != null)
+            {
+                foreach (var subrule in rule.ClassSkills)
+                {
+                    var (classes, points) = GetItemStatAddClassSkills(item, subrule.Key);
+                    if (points > 0)
+                    {
+                        foreach (var className in classes)
+                        {
+                            itemSuffix += $" (+{points} {className} skills)";
+                        }
+                    }
+                }
+            }
+
+            if (rule.SkillTrees != null)
+            {
+                foreach (var subrule in rule.SkillTrees)
+                {
+                    var (skillTrees, points) = GetItemStatAddSkillTreeSkills(item, subrule.Key);
+                    if (points > 0)
+                    {
+                        foreach (var skillTree in skillTrees)
+                        {
+                            itemSuffix += $" (+{points} {skillTree.Name()} skills)";
+                        }
+                    }
+                }
+            }
+
+            if (rule.Skills != null)
+            {
+                foreach (var subrule in rule.Skills)
+                {
+                    var (skills, points) = GetItemStatAddSingleSkills(item, subrule.Key);
+                    if (points > 0)
+                    {
+                        foreach (var skill in skills)
+                        {
+                            itemSuffix += $" (+{points} {skill.Name()})";
+                        }
+                    }
+                }
+            }
+
+            if (rule.SkillCharges != null)
+            {
+                foreach (var subrule in rule.SkillCharges)
+                {
+                    var (skillLevel, currentCharges, maxCharges) = GetItemStatAddSkillCharges(item, subrule.Key);
+                    if (skillLevel > 0)
+                    {
+                        var charges = "";
+                        if (currentCharges > 0 && maxCharges > 0)
+                        {
+                            charges = $"{currentCharges}/{maxCharges}";
+                        }
+                        itemSuffix += $" (+{skillLevel} {subrule.Key.Name()} {charges} charges)";
+                    }
+                }
+            }
+
+            foreach (var (stat, shift) in Stats.StatShifts.Select(x => (x.Key, x.Value)))
+            {
+                var property = rule.GetType().GetProperty(stat.ToString());
+                if (property == null) continue;
+                var propertyValue = property.GetValue(rule, null);
+                if (propertyValue == null) continue;
+
+                var yamlAttribute = property.CustomAttributes.FirstOrDefault(x => x.AttributeType == typeof(YamlMemberAttribute));
+                var propName = property.Name;
+
+                if (yamlAttribute != null) propName = yamlAttribute.NamedArguments.FirstOrDefault(x => x.MemberName == "Alias").TypedValue.Value.ToString();
+
+                var statValue = GetItemStatShifted(item, stat);
+                if (statValue > 0)
+                {
+                    itemSuffix += $" ({statValue} {propName})";
+                }
+                statsProcessed.Add(stat);
+            }
+
+            foreach (var property in rule.GetType().GetProperties())
+            {
+                var yamlAttribute = property.CustomAttributes.FirstOrDefault(x => x.AttributeType == typeof(YamlMemberAttribute));
+                var propName = property.Name;
+
+                if (yamlAttribute != null) propName = yamlAttribute.NamedArguments.FirstOrDefault(x => x.MemberName == "Alias").TypedValue.Value.ToString();
+
+                if (property.PropertyType == typeof(int?) && Enum.TryParse<Stats.Stat>(property.Name, out var stat))
+                {
+                    if (statsProcessed.Contains(stat)) continue;
+
+                    var propertyValue = rule.GetType().GetProperty(property.Name).GetValue(rule, null);
+                    if (propertyValue == null) continue;
+
+                    var statValue = GetItemStat(item, stat);
+                    if (statValue > 0)
+                    {
+                        itemSuffix += $" ({statValue} {propName})";
+                    }
+                }
+            }
+
+            switch (item.ItemData.ItemQuality)
+            {
+                case ItemQuality.UNIQUE:
+                    itemSpecialName = GetUniqueName(item) + " ";
+                    break;
+
+                case ItemQuality.SET:
+                    itemSpecialName = GetSetName(item) + " ";
+                    break;
+            }
+
+            return itemPrefix + itemSpecialName + itemBaseName + itemSuffix;
+        }
+
+        public static string ItemFullName(UnitItem item)
+        {
+            var itemFullName = item.ItemBaseName;
+
+            if (item.IsIdentified)
+            {
+                switch (item.ItemData.ItemQuality)
+                {
+                    case ItemQuality.UNIQUE:
+                        if (_UniqueFromId.TryGetValue(item.ItemData.uniqueOrSetId, out var foundFullUniqueName))
+                        {
+                            itemFullName = foundFullUniqueName;
+                        }
+                        break;
+                    case ItemQuality.SET:
+                        if (_SetFromId.TryGetValue(item.ItemData.uniqueOrSetId, out var foundFullSetName))
+                        {
+                            itemFullName = foundFullSetName;
+                        }
+                        break;
+                }
+            }
+
+            var localizedName = GetItemNameFromKey(itemFullName);
+            if (localizedName == "ItemNotFound") return itemFullName;
+            return localizedName;
+        }
+
+        public static string GetItemNameFromKey(string key)
+        {
+            LocalizedObj localItem;
+            if (!LocalizedItems.TryGetValue(key, out localItem))
             {
                 return "ItemNotFound";
             }
 
-            LocalizedItemObj localItem;
+            var lang = MapAssistConfiguration.Loaded.LanguageCode;
+            var prop = localItem.GetType().GetProperty(lang.ToString()).GetValue(localItem, null);
+
+            return prop.ToString();
+        }
+
+        public static string GetItemBaseName(UnitItem item)
+        {
+            string itemCode;
+            if (!_ItemCodes.TryGetValue(item.TxtFileNo, out itemCode))
+            {
+                return "ItemNotFound";
+            }
+
+            LocalizedObj localItem;
             if (!LocalizedItems.TryGetValue(itemCode, out localItem))
             {
                 return "ItemNotFound";
             }
 
-            return localItem.enUS;
+            var lang = MapAssistConfiguration.Loaded.LanguageCode;
+            var prop = localItem.GetType().GetProperty(lang.ToString()).GetValue(localItem, null);
+
+            return prop.ToString();
         }
 
-        public static string UniqueName(uint txtFileNo)
+        public static string GetItemName(UnitItem item)
         {
             string itemCode;
-            if (!_ItemCodes.TryGetValue(txtFileNo, out itemCode))
+            if (!_ItemCodes.TryGetValue(item.TxtFileNo, out itemCode))
+            {
+                return "ItemNotFound";
+            }
+
+            LocalizedObj localItem;
+            if (!LocalizedItems.TryGetValue(itemCode, out localItem))
+            {
+                return "ItemNotFound";
+            }
+
+            var lang = MapAssistConfiguration.Loaded.LanguageCode;
+            var prop = localItem.GetType().GetProperty(lang.ToString()).GetValue(localItem, null);
+
+            return prop.ToString();
+        }
+
+        public static string GetUniqueName(UnitItem item)
+        {
+            string itemCode;
+            if (!_ItemCodes.TryGetValue(item.TxtFileNo, out itemCode))
             {
                 return "Unique";
             }
@@ -176,19 +368,22 @@ namespace MapAssist.Types
                 return "Unique";
             }
 
-            LocalizedItemObj localItem;
+            LocalizedObj localItem;
             if (!LocalizedItems.TryGetValue(itemCode, out localItem))
             {
                 return "Unique";
             }
 
-            return localItem.enUS;
+            var lang = MapAssistConfiguration.Loaded.LanguageCode;
+            var prop = localItem.GetType().GetProperty(lang.ToString()).GetValue(localItem, null);
+
+            return prop.ToString();
         }
 
-        public static string SetName(uint txtFileNo)
+        public static string GetSetName(UnitItem item)
         {
             string itemCode;
-            if (!_ItemCodes.TryGetValue(txtFileNo, out itemCode))
+            if (!_ItemCodes.TryGetValue(item.TxtFileNo, out itemCode))
             {
                 return "Set";
             }
@@ -198,63 +393,262 @@ namespace MapAssist.Types
                 return "Set";
             }
 
-            LocalizedItemObj localItem;
+            LocalizedObj localItem;
             if (!LocalizedItems.TryGetValue(itemCode, out localItem))
             {
                 return "Set";
             }
 
-            return localItem.enUS;
+            var lang = MapAssistConfiguration.Loaded.LanguageCode;
+            var prop = localItem.GetType().GetProperty(lang.ToString()).GetValue(localItem, null);
+
+            return prop.ToString();
         }
 
-        public static void LogItem(UnitAny unit, int processId)
+        public static Color GetItemBaseColor(UnitItem unit)
         {
-            if ((!ItemUnitHashesSeen[processId].Contains(unit.ItemHash()) &&
-                !ItemUnitIdsSeen[processId].Contains(unit.UnitId)) && LootFilter.Filter(unit))
+            Color fontColor;
+            if (unit == null || !ItemColors.TryGetValue(unit.ItemData.ItemQuality, out fontColor))
             {
-                if (MapAssistConfiguration.Loaded.ItemLog.PlaySoundOnDrop)
-                {
-                    AudioPlayer.PlayItemAlert();
-                }
-
-                ItemUnitHashesSeen[processId].Add(unit.ItemHash());
-                ItemUnitIdsSeen[processId].Add(unit.UnitId);
-                ItemLog[processId].Add(unit);
-                var timer = new Timer(MapAssistConfiguration.Loaded.ItemLog.DisplayForSeconds * 1000);
-                timer.Elapsed += (sender, args) => ItemLogTimerElapsed(sender, args, timer, processId);
-                timer.Start();
-                //keep track of timers in each d2r process
-                if (ItemLogTimers.TryGetValue(processId, out var _))
-                {
-                    ItemLogTimers[processId].Add(timer);
-                }
-                else
-                {
-                    ItemLogTimers.Add(processId, new List<Timer>());
-                    ItemLogTimers[processId].Add(timer);
-                }
-            }
-        }
-
-        public static void ItemLogTimerElapsed(object sender, ElapsedEventArgs args, Timer self, int procId)
-        {
-            if (ItemLog.TryGetValue(procId, out var itemLog))
-            {
-                if (itemLog.Count > 0)
-                {
-                    itemLog.RemoveAt(0);
-                }
-
-                if (ItemLogTimers.TryGetValue(procId, out var timer))
-                {
-                    timer.Remove(self);
-                }
+                // Invalid item quality
+                return Color.Empty;
             }
 
-            self.Dispose();
+            var isEth = (unit.ItemData.ItemFlags & ItemFlags.IFLAG_ETHEREAL) == ItemFlags.IFLAG_ETHEREAL;
+            if (isEth && fontColor == Color.White)
+            {
+                return ItemColors[ItemQuality.SUPERIOR];
+            }
+
+            if (unit.Stats.ContainsKey(Stats.Stat.NumSockets) && fontColor == Color.White)
+            {
+                return ItemColors[ItemQuality.SUPERIOR];
+            }
+
+            if (unit.TxtFileNo >= 610 && unit.TxtFileNo <= 642)
+            {
+                // Runes
+                return ItemColors[ItemQuality.CRAFT];
+            }
+
+            switch (unit.TxtFileNo)
+            {
+                case 647: // Key of Terror
+                case 648: // Key of Hate
+                case 649: // Key of Destruction
+                case 653: // Token of Absolution
+                case 654: // Twisted Essence of Suffering
+                case 655: // Charged Essense of Hatred
+                case 656: // Burning Essence of Terror
+                case 657: // Festering Essence of Destruction
+                    return ItemColors[ItemQuality.CRAFT];
+            }
+
+            return fontColor;
         }
 
-        public readonly static Dictionary<ItemQuality, Color> ItemColors = new Dictionary<ItemQuality, Color>()
+        public static ItemTier GetItemTier(UnitItem item)
+        {
+            return GetItemTier(item.Item);
+        }
+
+        public static ItemTier GetItemTier(Item item)
+        {
+            var itemClasses = ItemClasses.Where(x => x.Value.Contains(item));
+            if (itemClasses.Count() == 0) return ItemTier.NotApplicable;
+
+            var itemClass = itemClasses.First();
+            if (itemClass.Key == Item.ClassCirclets) return ItemTier.NotApplicable;
+
+            return (ItemTier)(Array.IndexOf(itemClass.Value, item) * 3 / itemClass.Value.Length); // All items with each class (except circlets) come in equal amounts within each tier
+        }
+
+        public static int GetItemStat(UnitItem item, Stats.Stat stat)
+        {
+            return item.Stats.TryGetValue(stat, out var statValue) ? statValue : 0;
+        }
+
+        public static int GetItemStatShifted(UnitItem item, Stats.Stat stat)
+        {
+            return item.Stats.TryGetValue(stat, out var statValue) && Stats.StatShifts.TryGetValue(stat, out var shift) ? statValue >> shift : 0;
+        }
+
+        public static double GetItemStatDecimal(UnitItem item, Stats.Stat stat)
+        {
+            return item.Stats.TryGetValue(stat, out var statValue) && Stats.StatDivisors.TryGetValue(stat, out var divisor) ? statValue / divisor : 0;
+        }
+
+        public static int GetItemStatResists(UnitItem item, bool sumOfEach)
+        {
+            item.Stats.TryGetValue(Stats.Stat.FireResist, out var fireRes);
+            item.Stats.TryGetValue(Stats.Stat.LightningResist, out var lightRes);
+            item.Stats.TryGetValue(Stats.Stat.ColdResist, out var coldRes);
+            item.Stats.TryGetValue(Stats.Stat.PoisonResist, out var psnRes);
+            var resistances = new[] { fireRes, lightRes, coldRes, psnRes };
+            return sumOfEach ? resistances.Sum() : resistances.Min();
+        }
+
+        public static int GetItemStatAllAttributes(UnitItem item)
+        {
+            item.Stats.TryGetValue(Stats.Stat.Strength, out var strength);
+            item.Stats.TryGetValue(Stats.Stat.Dexterity, out var dexterity);
+            item.Stats.TryGetValue(Stats.Stat.Vitality, out var vitality);
+            item.Stats.TryGetValue(Stats.Stat.Energy, out var energy);
+            return new[] { strength, dexterity, vitality, energy }.Min();
+        }
+
+        public static (Structs.PlayerClass[], int) GetItemStatAddClassSkills(UnitItem item, Structs.PlayerClass playerClass)
+        {
+            var allSkills = GetItemStat(item, Stats.Stat.AllSkills);
+
+            if (playerClass == Structs.PlayerClass.Any)
+            {
+                var maxClassSkills = 0;
+                var maxClasses = new List<Structs.PlayerClass>();
+
+                for (var classId = Structs.PlayerClass.Amazon; classId <= Structs.PlayerClass.Assassin; classId++)
+                {
+                    if (item.StatLayers.TryGetValue(Stats.Stat.AddClassSkills, out var anyItemStats) &&
+                        anyItemStats.TryGetValue((ushort)classId, out var anyClassSkills))
+                    {
+                        if (anyClassSkills > maxClassSkills)
+                        {
+                            maxClasses = new List<Structs.PlayerClass>() { classId };
+                            maxClassSkills = anyClassSkills;
+                        }
+                        else if (anyClassSkills == maxClassSkills)
+                        {
+                            maxClasses.Add(classId);
+                        }
+                    }
+                }
+
+                return (maxClasses.ToArray(), allSkills + maxClassSkills);
+            }
+
+            if (item.StatLayers.TryGetValue(Stats.Stat.AddClassSkills, out var itemStats) &&
+                itemStats.TryGetValue((ushort)playerClass, out var addClassSkills))
+            {
+                return (new Structs.PlayerClass[] { playerClass }, allSkills + addClassSkills);
+            }
+
+            return (new Structs.PlayerClass[] { playerClass }, allSkills);
+        }
+
+        public static (SkillTree[], int) GetItemStatAddSkillTreeSkills(UnitItem item, SkillTree skillTree)
+        {
+            if (skillTree == SkillTree.Any)
+            {
+                var maxSkillTreeQuantity = 0;
+                var maxSkillTrees = new List<SkillTree>();
+
+                foreach (var skillTreeId in Enum.GetValues(typeof(SkillTree)).Cast<SkillTree>().Where(x => x != SkillTree.Any).ToList())
+                {
+                    if (item.StatLayers.TryGetValue(Stats.Stat.AddSkillTab, out var anyItemStats) &&
+                        anyItemStats.TryGetValue((ushort)skillTreeId, out var anyTabSkills))
+                    {
+                        anyTabSkills += GetItemStatAddClassSkills(item, skillTreeId.GetPlayerClass()).Item2; // This adds the +class skill points and +all skills points
+
+                        if (anyTabSkills > maxSkillTreeQuantity)
+                        {
+                            maxSkillTrees = new List<SkillTree>() { skillTreeId };
+                            maxSkillTreeQuantity = anyTabSkills;
+                        }
+                        else if (anyTabSkills == maxSkillTreeQuantity)
+                        {
+                            maxSkillTrees.Add(skillTreeId);
+                        }
+                    }
+                }
+
+                return (maxSkillTrees.ToArray(), maxSkillTreeQuantity);
+            }
+
+            var baseAddSkills = GetItemStatAddClassSkills(item, skillTree.GetPlayerClass()).Item2; // This adds the +class skill points and +all skills points
+
+            if (item.StatLayers.TryGetValue(Stats.Stat.AddSkillTab, out var itemStats) &&
+                itemStats.TryGetValue((ushort)skillTree, out var addSkillTab))
+            {
+                return (new SkillTree[] { skillTree }, baseAddSkills + addSkillTab);
+            }
+
+            return (new SkillTree[] { skillTree }, baseAddSkills);
+        }
+
+        public static (Skill[], int) GetItemStatAddSingleSkills(UnitItem item, Skill skill)
+        {
+            var itemSkillsStats = new List<Stats.Stat>()
+            {
+                Stats.Stat.SingleSkill,
+                Stats.Stat.NonClassSkill,
+            };
+
+            if (skill == Skill.Any)
+            {
+                var maxSkillQuantity = 0;
+                var maxSkills = new List<Skill>();
+
+                foreach (var statType in itemSkillsStats)
+                {
+                    foreach (var skillId in SkillExtensions.SkillTreeToSkillDict.SelectMany(x => x.Value).ToList())
+                    {
+                        if (item.StatLayers.TryGetValue(statType, out var anyItemStats) &&
+                            anyItemStats.TryGetValue((ushort)skillId, out var anySkillLevel))
+                        {
+                            anySkillLevel += (statType == Stats.Stat.SingleSkill ? GetItemStatAddSkillTreeSkills(item, skillId.GetSkillTree()).Item2 : 0); // This adds the +skill tree points, +class skill points and +all skills points
+
+                            if (anySkillLevel > maxSkillQuantity)
+                            {
+                                maxSkills = new List<Skill>() { skillId };
+                                maxSkillQuantity = anySkillLevel;
+                            }
+                            else if (anySkillLevel == maxSkillQuantity)
+                            {
+                                maxSkills.Add(skillId);
+                            }
+                        }
+                    }
+                }
+
+                return (maxSkills.ToArray(), maxSkillQuantity);
+            }
+
+            var baseAddSkills = GetItemStatAddSkillTreeSkills(item, skill.GetSkillTree()).Item2; // This adds the +skill tree points, +class skill points and +all skills points
+
+            foreach (var statType in itemSkillsStats)
+            {
+                if (item.StatLayers.TryGetValue(statType, out var itemStats) &&
+                    itemStats.TryGetValue((ushort)skill, out var skillLevel))
+                {
+                    return (new Skill[] { skill }, (statType == Stats.Stat.SingleSkill ? baseAddSkills : 0) + skillLevel);
+                }
+            }
+
+            return (new Skill[] { skill }, baseAddSkills);
+        }
+
+        public static (int, int, int) GetItemStatAddSkillCharges(UnitItem item, Skill skill)
+        {
+            if (item.StatLayers.TryGetValue(Stats.Stat.ItemChargedSkill, out var itemStats))
+            {
+                foreach (var stat in itemStats)
+                {
+                    var skillId = stat.Key >> 6;
+                    var level = stat.Key % (1 << 6);
+
+                    if (skillId == (int)skill && itemStats.TryGetValue(stat.Key, out var data))
+                    {
+                        var maxCharges = data >> 8;
+                        var currentCharges = data % (1 << 8);
+
+                        return (level, currentCharges, maxCharges);
+                    }
+                }
+            }
+            return (0, 0, 0);
+        }
+
+        public static readonly Dictionary<ItemQuality, Color> ItemColors = new Dictionary<ItemQuality, Color>()
         {
             {ItemQuality.INFERIOR, Color.White},
             {ItemQuality.NORMAL, Color.White},
@@ -266,7 +660,539 @@ namespace MapAssist.Types
             {ItemQuality.CRAFT, ColorTranslator.FromHtml("#FFAE00")},
         };
 
-        public readonly static Dictionary<string, string> _SetFromCode = new Dictionary<string, string>()
+        public static readonly Dictionary<uint, string> _SetFromId = new Dictionary<uint, string>()
+        {
+            {0, "Civerb's Ward"},
+            {1, "Civerb's Icon"},
+            {2, "Civerb's Cudgel"},
+            {3, "Hsarus' Iron Heel"},
+            {4, "Hsarus' Iron Fist"},
+            {5, "Hsarus' Iron Stay"},
+            {6, "Cleglaw's Tooth"},
+            {7, "Cleglaw's Claw"},
+            {8, "Cleglaw's Pincers"},
+            {9, "Iratha's Collar"},
+            {10, "Iratha's Cuff"},
+            {11, "Iratha's Coil"},
+            {12, "Iratha's Cord"},
+            {13, "Isenhart's Lightbrand"},
+            {14, "Isenhart's Parry"},
+            {15, "Isenhart's Case"},
+            {16, "Isenhart's Horns"},
+            {17, "Vidala's Barb"},
+            {18, "Vidala's Fetlock"},
+            {19, "Vidala's Ambush"},
+            {20, "Vidala's Snare"},
+            {21, "Milabrega's Orb"},
+            {22, "Milabrega's Rod"},
+            {23, "Milabrega's Diadem"},
+            {24, "Milabrega's Robe"},
+            {25, "Cathan's Rule"},
+            {26, "Cathan's Mesh"},
+            {27, "Cathan's Visage"},
+            {28, "Cathan's Sigil"},
+            {29, "Cathan's Seal"},
+            {30, "Tancred's Crowbill"},
+            {31, "Tancred's Spine"},
+            {32, "Tancred's Hobnails"},
+            {33, "Tancred's Weird"},
+            {34, "Tancred's Skull"},
+            {35, "Sigon's Gage"},
+            {36, "Sigon's Visor"},
+            {37, "Sigon's Shelter"},
+            {38, "Sigon's Sabot"},
+            {39, "Sigon's Wrap"},
+            {40, "Sigon's Guard"},
+            {41, "Infernal Cranium"},
+            {42, "Infernal Torch"},
+            {43, "Infernal Sign"},
+            {44, "Berserker's Headgear"},
+            {45, "Berserker's Hauberk"},
+            {46, "Berserker's Hatchet"},
+            {47, "Death's Hand"},
+            {48, "Death's Guard"},
+            {49, "Death's Touch"},
+            {50, "Angelic Sickle"},
+            {51, "Angelic Mantle"},
+            {52, "Angelic Halo"},
+            {53, "Angelic Wings"},
+            {54, "Arctic Horn"},
+            {55, "Arctic Furs"},
+            {56, "Arctic Binding"},
+            {57, "Arctic Mitts"},
+            {58, "Arcanna's Sign"},
+            {59, "Arcanna's Deathwand"},
+            {60, "Arcanna's Head"},
+            {61, "Arcanna's Flesh"},
+            {62, "Natalya's Totem"},
+            {63, "Natalya's Mark"},
+            {64, "Natalya's Shadow"},
+            {65, "Natalya's Soul"},
+            {66, "Aldur's Stony Gaze"},
+            {67, "Aldur's Deception"},
+            {68, "Aldur's Gauntlet"},
+            {69, "Aldur's Advance"},
+            {70, "Immortal King's Will"},
+            {71, "Immortal King's Soul Cage"},
+            {72, "Immortal King's Detail"},
+            {73, "Immortal King's Forge"},
+            {74, "Immortal King's Pillar"},
+            {75, "Immortal King's Stone Crusher"},
+            {76, "Tal Rasha's Fire-Spun Cloth"},
+            {77, "Tal Rasha's Adjudication"},
+            {78, "Tal Rasha's Lidless Eye"},
+            {79, "Tal Rasha's Howling Wind"},
+            {80, "Tal Rasha's Horadric Crest"},
+            {81, "Griswold's Valor"},
+            {82, "Griswold's Heart"},
+            {83, "Griswolds's Redemption"},
+            {84, "Griswold's Honor"},
+            {85, "Trang-Oul's Guise"},
+            {86, "Trang-Oul's Scales"},
+            {87, "Trang-Oul's Wing"},
+            {88, "Trang-Oul's Claws"},
+            {89, "Trang-Oul's Girth"},
+            {90, "M'avina's True Sight"},
+            {91, "M'avina's Embrace"},
+            {92, "M'avina's Icy Clutch"},
+            {93, "M'avina's Tenet"},
+            {94, "M'avina's Caster"},
+            {95, "Telling of Beads"},
+            {96, "Laying of Hands"},
+            {97, "Rite of Passage"},
+            {98, "Spiritual Custodian"},
+            {99, "Credendum"},
+            {100, "Dangoon's Teaching"},
+            {101, "Heaven's Taebaek"},
+            {102, "Haemosu's Adament"},
+            {103, "Ondal's Almighty"},
+            {104, "Guillaume's Face"},
+            {105, "Wilhelm's Pride"},
+            {106, "Magnus' Skin"},
+            {107, "Wihtstan's Guard"},
+            {108, "Hwanin's Splendor"},
+            {109, "Hwanin's Refuge"},
+            {110, "Hwanin's Seal"},
+            {111, "Hwanin's Justice"},
+            {112, "Sazabi's Cobalt Redeemer"},
+            {113, "Sazabi's Ghost Liberator"},
+            {114, "Sazabi's Mental Sheath"},
+            {115, "Bul-Kathos' Sacred Charge"},
+            {116, "Bul-Kathos' Tribal Guardian"},
+            {117, "Cow King's Horns"},
+            {118, "Cow King's Hide"},
+            {119, "Cow King's Hoofs"},
+            {120, "Naj's Puzzler"},
+            {121, "Naj's Light Plate"},
+            {122, "Naj's Circlet"},
+            {123, "McAuley's Paragon"},
+            {124, "McAuley's Riprap"},
+            {125, "McAuley's Taboo"},
+            {126, "McAuley's Superstition"}
+        };
+
+        public static readonly Dictionary<uint, string> _UniqueFromId = new Dictionary<uint, string>()
+        {
+            {0, "The Gnasher"},
+            {1, "Deathspade"},
+            {2, "Bladebone"},
+            {3, "Mindrend"},
+            {4, "Rakescar"},
+            {5, "Fechmars Axe"},
+            {6, "Goreshovel"},
+            {7, "The Chieftan"},
+            {8, "Brainhew"},
+            {9, "The Humongous"},
+            {10, "Iros Torch"},
+            {11, "Maelstromwrath"},
+            {12, "Gravenspine"},
+            {13, "Umes Lament"},
+            {14, "Felloak"},
+            {15, "Knell Striker"},
+            {16, "Rusthandle"},
+            {17, "Stormeye"},
+            {18, "Stoutnail"},
+            {19, "Crushflange"},
+            {20, "Bloodrise"},
+            {21, "The Generals Tan Do Li Ga"},
+            {22, "Ironstone"},
+            {23, "Bonesob"},
+            {24, "Steeldriver"},
+            {25, "Rixots Keen"},
+            {26, "Blood Crescent"},
+            {27, "Krintizs Skewer"},
+            {28, "Gleamscythe"},
+            {29, "Azurewrath"},
+            {30, "Griswolds Edge"},
+            {31, "Hellplague"},
+            {32, "Culwens Point"},
+            {33, "Shadowfang"},
+            {34, "Soulflay"},
+            {35, "Kinemils Awl"},
+            {36, "Blacktongue"},
+            {37, "Ripsaw"},
+            {38, "The Patriarch"},
+            {39, "Gull"},
+            {40, "The Diggler"},
+            {41, "The Jade Tan Do"},
+            {42, "Irices Shard"},
+            {43, "The Dragon Chang"},
+            {44, "Razortine"},
+            {45, "Bloodthief"},
+            {46, "Lance of Yaggai"},
+            {47, "The Tannr Gorerod"},
+            {48, "Dimoaks Hew"},
+            {49, "Steelgoad"},
+            {50, "Soul Harvest"},
+            {51, "The Battlebranch"},
+            {52, "Woestave"},
+            {53, "The Grim Reaper"},
+            {54, "Bane Ash"},
+            {55, "Serpent Lord"},
+            {56, "Lazarus Spire"},
+            {57, "The Salamander"},
+            {58, "The Iron Jang Bong"},
+            {59, "Pluckeye"},
+            {60, "Witherstring"},
+            {61, "Rimeraven"},
+            {62, "Piercerib"},
+            {63, "Pullspite"},
+            {64, "Wizendraw"},
+            {65, "Hellclap"},
+            {66, "Blastbark"},
+            {67, "Leadcrow"},
+            {68, "Ichorsting"},
+            {69, "Hellcast"},
+            {70, "Doomspittle"},
+            {71, "War Bonnet"},
+            {72, "Tarnhelm"},
+            {73, "Coif of Glory"},
+            {74, "Duskdeep"},
+            {75, "Wormskull"},
+            {76, "Howltusk"},
+            {77, "Undead Crown"},
+            {78, "The Face of Horror"},
+            {79, "Greyform"},
+            {80, "Blinkbats Form"},
+            {81, "The Centurion"},
+            {82, "Twitchthroe"},
+            {83, "Darkglow"},
+            {84, "Hawkmail"},
+            {85, "Sparking Mail"},
+            {86, "Venomsward"},
+            {87, "Iceblink"},
+            {88, "Boneflesh"},
+            {89, "Rockfleece"},
+            {90, "Rattlecage"},
+            {91, "Goldskin"},
+            {92, "Victors Silk"},
+            {93, "Heavenly Garb"},
+            {94, "Pelta Lunata"},
+            {95, "Umbral Disk"},
+            {96, "Stormguild"},
+            {97, "Wall of the Eyeless"},
+            {98, "Swordback Hold"},
+            {99, "Steelclash"},
+            {100, "Bverrit Keep"},
+            {101, "The Ward"},
+            {102, "The Hand of Broc"},
+            {103, "Bloodfist"},
+            {104, "Chance Guards"},
+            {105, "Magefist"},
+            {106, "Frostburn"},
+            {107, "Hotspur"},
+            {108, "Gorefoot"},
+            {109, "Treads of Cthon"},
+            {110, "Goblin Toe"},
+            {111, "Tearhaunch"},
+            {112, "Lenyms Cord"},
+            {113, "Snakecord"},
+            {114, "Nightsmoke"},
+            {115, "Goldwrap"},
+            {116, "Bladebuckle"},
+            {117, "Nokozan Relic"},
+            {118, "The Eye of Etlich"},
+            {119, "The Mahim-Oak Curio"},
+            {120, "Nagelring"},
+            {121, "Manald Heal"},
+            {122, "The Stone of Jordan"},
+            {123, "Amulet of the Viper"},
+            {124, "Staff of Kings"},
+            {125, "Horadric Staff"},
+            {126, "Hell Forge Hammer"},
+            {127, "KhalimFlail"},
+            {128, "SuperKhalimFlail"},
+            {129, "Coldkill"},
+            {130, "Butcher's Pupil"},
+            {131, "Islestrike"},
+            {132, "Pompe's Wrath"},
+            {133, "Guardian Naga"},
+            {134, "Warlord's Trust"},
+            {135, "Spellsteel"},
+            {136, "Stormrider"},
+            {137, "Boneslayer Blade"},
+            {138, "The Minataur"},
+            {139, "Suicide Branch"},
+            {140, "Carin Shard"},
+            {141, "Arm of King Leoric"},
+            {142, "Blackhand Key"},
+            {143, "Dark Clan Crusher"},
+            {144, "Zakarum's Hand"},
+            {145, "The Fetid Sprinkler"},
+            {146, "Hand of Blessed Light"},
+            {147, "Fleshrender"},
+            {148, "Sureshrill Frost"},
+            {149, "Moonfall"},
+            {150, "Baezil's Vortex"},
+            {151, "Earthshaker"},
+            {152, "Bloodtree Stump"},
+            {153, "The Gavel of Pain"},
+            {154, "Bloodletter"},
+            {155, "Coldsteel Eye"},
+            {156, "Hexfire"},
+            {157, "Blade of Ali Baba"},
+            {158, "Ginther's Rift"},
+            {159, "Headstriker"},
+            {160, "Plague Bearer"},
+            {161, "The Atlantian"},
+            {162, "Crainte Vomir"},
+            {163, "Bing Sz Wang"},
+            {164, "The Vile Husk"},
+            {165, "Cloudcrack"},
+            {166, "Todesfaelle Flamme"},
+            {167, "Swordguard"},
+            {168, "Spineripper"},
+            {169, "Heart Carver"},
+            {170, "Blackbog's Sharp"},
+            {171, "Stormspike"},
+            {172, "The Impaler"},
+            {173, "Kelpie Snare"},
+            {174, "Soulfeast Tine"},
+            {175, "Hone Sundan"},
+            {176, "Spire of Honor"},
+            {177, "The Meat Scraper"},
+            {178, "Blackleach Blade"},
+            {179, "Athena's Wrath"},
+            {180, "Pierre Tombale Couant"},
+            {181, "Husoldal Evo"},
+            {182, "Grim's Burning Dead"},
+            {183, "Razorswitch"},
+            {184, "Ribcracker"},
+            {185, "Chromatic Ire"},
+            {186, "Warpspear"},
+            {187, "Skullcollector"},
+            {188, "Skystrike"},
+            {189, "Riphook"},
+            {190, "Kuko Shakaku"},
+            {191, "Endlesshail"},
+            {192, "Whichwild String"},
+            {193, "Cliffkiller"},
+            {194, "Magewrath"},
+            {195, "Godstrike Arch"},
+            {196, "Langer Briser"},
+            {197, "Pus Spiter"},
+            {198, "Buriza-Do Kyanon"},
+            {199, "Demon Machine"},
+            {201, "Peasent Crown"},
+            {202, "Rockstopper"},
+            {203, "Stealskull"},
+            {204, "Darksight Helm"},
+            {205, "Valkiry Wing"},
+            {206, "Crown of Thieves"},
+            {207, "Blackhorn's Face"},
+            {208, "Vampiregaze"},
+            {209, "The Spirit Shroud"},
+            {210, "Skin of the Vipermagi"},
+            {211, "Skin of the Flayerd One"},
+            {212, "Ironpelt"},
+            {213, "Spiritforge"},
+            {214, "Crow Caw"},
+            {215, "Shaftstop"},
+            {216, "Duriel's Shell"},
+            {217, "Skullder's Ire"},
+            {218, "Guardian Angel"},
+            {219, "Toothrow"},
+            {220, "Atma's Wail"},
+            {221, "Black Hades"},
+            {222, "Corpsemourn"},
+            {223, "Que-Hegan's Wisdon"},
+            {224, "Visceratuant"},
+            {225, "Mosers Blessed Circle"},
+            {226, "Stormchaser"},
+            {227, "Tiamat's Rebuke"},
+            {228, "Kerke's Sanctuary"},
+            {229, "Radimant's Sphere"},
+            {230, "Lidless Wall"},
+            {231, "Lance Guard"},
+            {232, "Venom Grip"},
+            {233, "Gravepalm"},
+            {234, "Ghoulhide"},
+            {235, "Lavagout"},
+            {236, "Hellmouth"},
+            {237, "Infernostride"},
+            {238, "Waterwalk"},
+            {239, "Silkweave"},
+            {240, "Wartraveler"},
+            {241, "Gorerider"},
+            {242, "String of Ears"},
+            {243, "Razortail"},
+            {244, "Gloomstrap"},
+            {245, "Snowclash"},
+            {246, "Thudergod's Vigor"},
+            {248, "Harlequin Crest"},
+            {249, "Veil of Steel"},
+            {250, "The Gladiator's Bane"},
+            {251, "Arkaine's Valor"},
+            {252, "Blackoak Shield"},
+            {253, "Stormshield"},
+            {254, "Hellslayer"},
+            {255, "Messerschmidt's Reaver"},
+            {256, "Baranar's Star"},
+            {257, "Schaefer's Hammer"},
+            {258, "The Cranium Basher"},
+            {259, "Lightsabre"},
+            {260, "Doombringer"},
+            {261, "The Grandfather"},
+            {262, "Wizardspike"},
+            {263, "Constricting Ring"},
+            {264, "Stormspire"},
+            {265, "Eaglehorn"},
+            {266, "Windforce"},
+            {268, "Bul Katho's Wedding Band"},
+            {269, "The Cat's Eye"},
+            {270, "The Rising Sun"},
+            {271, "Crescent Moon"},
+            {272, "Mara's Kaleidoscope"},
+            {273, "Atma's Scarab"},
+            {274, "Dwarf Star"},
+            {275, "Raven Frost"},
+            {276, "Highlord's Wrath"},
+            {277, "Saracen's Chance"},
+            {279, "Arreat's Face"},
+            {280, "Homunculus"},
+            {281, "Titan's Revenge"},
+            {282, "Lycander's Aim"},
+            {283, "Lycander's Flank"},
+            {284, "The Oculus"},
+            {285, "Herald of Zakarum"},
+            {286, "Cutthroat1"},
+            {287, "Jalal's Mane"},
+            {288, "The Scalper"},
+            {289, "Bloodmoon"},
+            {290, "Djinnslayer"},
+            {291, "Deathbit"},
+            {292, "Warshrike"},
+            {293, "Gutsiphon"},
+            {294, "Razoredge"},
+            {295, "Gore Ripper"},
+            {296, "Demonlimb"},
+            {297, "Steelshade"},
+            {298, "Tomb Reaver"},
+            {299, "Deaths's Web"},
+            {300, "Nature's Peace"},
+            {301, "Azurewrath"},
+            {302, "Seraph's Hymn"},
+            {303, "Zakarum's Salvation"},
+            {304, "Fleshripper"},
+            {305, "Odium"},
+            {306, "Horizon's Tornado"},
+            {307, "Stone Crusher"},
+            {308, "Jadetalon"},
+            {309, "Shadowdancer"},
+            {310, "Cerebus"},
+            {311, "Tyrael's Might"},
+            {312, "Souldrain"},
+            {313, "Runemaster"},
+            {314, "Deathcleaver"},
+            {315, "Executioner's Justice"},
+            {316, "Stoneraven"},
+            {317, "Leviathan"},
+            {318, "Larzuk's Champion"},
+            {319, "Wisp"},
+            {320, "Gargoyle's Bite"},
+            {321, "Lacerator"},
+            {322, "Mang Song's Lesson"},
+            {323, "Viperfork"},
+            {324, "Ethereal Edge"},
+            {325, "Demonhorn's Edge"},
+            {326, "The Reaper's Toll"},
+            {327, "Spiritkeeper"},
+            {328, "Hellrack"},
+            {329, "Alma Negra"},
+            {330, "Darkforge Spawn"},
+            {331, "Widowmaker"},
+            {332, "Bloodraven's Charge"},
+            {333, "Ghostflame"},
+            {334, "Shadowkiller"},
+            {335, "Gimmershred"},
+            {336, "Griffon's Eye"},
+            {337, "Windhammer"},
+            {338, "Thunderstroke"},
+            {339, "Giantmaimer"},
+            {340, "Demon's Arch"},
+            {341, "Boneflame"},
+            {342, "Steelpillar"},
+            {343, "Nightwing's Veil"},
+            {344, "Crown of Ages"},
+            {345, "Andariel's Visage"},
+            {346, "Darkfear"},
+            {347, "Dragonscale"},
+            {348, "Steel Carapice"},
+            {349, "Medusa's Gaze"},
+            {350, "Ravenlore"},
+            {351, "Boneshade"},
+            {352, "Nethercrow"},
+            {353, "Flamebellow"},
+            {354, "Fathom"},
+            {355, "Wolfhowl"},
+            {356, "Spirit Ward"},
+            {357, "Kira's Guardian"},
+            {358, "Ormus' Robes"},
+            {359, "Gheed's Fortune"},
+            {360, "Stormlash"},
+            {361, "Halaberd's Reign"},
+            {362, "Warriv's Warder"},
+            {363, "Spike Thorn"},
+            {364, "Dracul's Grasp"},
+            {365, "Frostwind"},
+            {366, "Templar's Might"},
+            {367, "Eschuta's temper"},
+            {368, "Firelizard's Talons"},
+            {369, "Sandstorm Trek"},
+            {370, "Marrowwalk"},
+            {371, "Heaven's Light"},
+            {372, "Merman's Speed"},
+            {373, "Arachnid Mesh"},
+            {374, "Nosferatu's Coil"},
+            {375, "Metalgrid"},
+            {376, "Verdugo's Hearty Cord"},
+            {377, "Sigurd's Staunch"},
+            {378, "Carrion Wind"},
+            {379, "Giantskull"},
+            {380, "Ironward"},
+            {381, "Annihilus"},
+            {382, "Arioc's Needle"},
+            {383, "Cranebeak"},
+            {384, "Nord's Tenderizer"},
+            {385, "Earthshifter"},
+            {386, "Wraithflight"},
+            {387, "Bonehew"},
+            {388, "Ondal's Wisdom"},
+            {389, "The Reedeemer"},
+            {390, "Headhunter's Glory"},
+            {391, "Steelrend"},
+            {392, "Rainbow Facet"},
+            {393, "Rainbow Facet"},
+            {394, "Rainbow Facet"},
+            {395, "Rainbow Facet"},
+            {396, "Rainbow Facet"},
+            {397, "Rainbow Facet"},
+            {398, "Rainbow Facet"},
+            {399, "Rainbow Facet"},
+            {400, "Hellfire Torch"}
+        };
+
+        public static readonly Dictionary<string, string> _SetFromCode = new Dictionary<string, string>()
         {
             {"lrg", "Civerb's Ward"},
             {"amu", "Set"}, //Amulet
@@ -382,7 +1308,7 @@ namespace MapAssist.Types
             {"bwn", "McAuley's Superstition"}
         };
 
-        public readonly static Dictionary<string, string> _UniqueFromCode = new Dictionary<string, string>()
+        public static readonly Dictionary<string, string> _UniqueFromCode = new Dictionary<string, string>()
         {
             {"hax", "The Gnasher"},
             {"axe", "Deathspade"},
@@ -739,7 +1665,7 @@ namespace MapAssist.Types
             {"cm2", "Hellfire Torch"}
         };
 
-        public readonly static Dictionary<uint, string> _ItemCodes = new Dictionary<uint, string>()
+        public static readonly Dictionary<uint, string> _ItemCodes = new Dictionary<uint, string>()
         {
             {0, "hax"},
             {1, "axe"},
@@ -1402,667 +2328,895 @@ namespace MapAssist.Types
             {658, "std"}
         };
 
-        public readonly static Dictionary<uint, string> _ItemNames = new Dictionary<uint, string>()
+        public static Dictionary<Item, Item[]> ItemClasses = new Dictionary<Item, Item[]>()
         {
-            {0, "Hand Axe"},
-            {1, "Axe"},
-            {2, "Double Axe"},
-            {3, "Military Pick"},
-            {4, "War Axe"},
-            {5, "Large Axe"},
-            {6, "Broad Axe"},
-            {7, "Battle Axe"},
-            {8, "Great Axe"},
-            {9, "Giant Axe"},
-            {10, "Wand"},
-            {11, "Yew Wand"},
-            {12, "Bone Wand"},
-            {13, "Grim Wand"},
-            {14, "Club"},
-            {15, "Scepter"},
-            {16, "Grand Scepter"},
-            {17, "War Scepter"},
-            {18, "Spiked Club"},
-            {19, "Mace"},
-            {20, "Morning Star"},
-            {21, "Flail"},
-            {22, "War Hammer"},
-            {23, "Maul"},
-            {24, "Great Maul"},
-            {25, "Short Sword"},
-            {26, "Scimitar"},
-            {27, "Saber"},
-            {28, "Falchion"},
-            {29, "Crystal Sword"},
-            {30, "Broad Sword"},
-            {31, "Long Sword"},
-            {32, "War Sword"},
-            {33, "Two-Handed Sword"},
-            {34, "Claymore"},
-            {35, "Giant Sword"},
-            {36, "Bastard Sword"},
-            {37, "Flamberge"},
-            {38, "Great Sword"},
-            {39, "Dagger"},
-            {40, "Dirk"},
-            {41, "Kriss"},
-            {42, "Blade"},
-            {43, "Throwing Knife"},
-            {44, "Throwing Axe"},
-            {45, "Balanced Knife"},
-            {46, "Balanced Axe"},
-            {47, "Javelin"},
-            {48, "Pilum"},
-            {49, "Short Spear"},
-            {50, "Glaive"},
-            {51, "Throwing Spear"},
-            {52, "Spear"},
-            {53, "Trident"},
-            {54, "Brandistock"},
-            {55, "Spetum"},
-            {56, "Pike"},
-            {57, "Bardiche"},
-            {58, "Voulge"},
-            {59, "Scythe"},
-            {60, "Poleaxe"},
-            {61, "Halberd"},
-            {62, "War Scythe"},
-            {63, "Short Staff"},
-            {64, "Long Staff"},
-            {65, "Gnarled Staff"},
-            {66, "Battle Staff"},
-            {67, "War Staff"},
-            {68, "Short Bow"},
-            {69, "Hunter's Bow"},
-            {70, "Long Bow"},
-            {71, "Composite Bow"},
-            {72, "Short Battle Bow"},
-            {73, "Long Battle Bow"},
-            {74, "Short War Bow"},
-            {75, "Long War Bow"},
-            {76, "Light Crossbow"},
-            {77, "Crossbow"},
-            {78, "Heavy Crossbow"},
-            {79, "Repeating Crossbow"},
-            {80, "Rancid Gas Potion"},
-            {81, "Oil Potion"},
-            {82, "Choking Gas Potion"},
-            {83, "Exploding Potion"},
-            {84, "Strangling Gas Potion"},
-            {85, "Fulminating Potion"},
-            {86, "Decoy Gidbinn"},
-            {87, "The Gidbinn"},
-            {88, "Wirt's Leg"},
-            {89, "Horadric Malus"},
-            {90, "Hellforge Hammer"},
-            {91, "Horadric Staff"},
-            {92, "Staff of Kings"},
-            {93, "Hatchet"},
-            {94, "Cleaver"},
-            {95, "Twin Axe"},
-            {96, "Crowbill"},
-            {97, "Naga"},
-            {98, "Military Axe"},
-            {99, "Bearded Axe"},
-            {100, "Tabar"},
-            {101, "Gothic Axe"},
-            {102, "Ancient Axe"},
-            {103, "Burnt Wand"},
-            {104, "Petrified Wand"},
-            {105, "Tomb Wand"},
-            {106, "Grave Wand"},
-            {107, "Cudgel"},
-            {108, "Rune Scepter"},
-            {109, "Holy Water Sprinkler"},
-            {110, "Divine Scepter"},
-            {111, "Barbed Club"},
-            {112, "Flanged Mace"},
-            {113, "Jagged Star"},
-            {114, "Knout"},
-            {115, "Battle Hammer"},
-            {116, "War Club"},
-            {117, "Martel de Fer"},
-            {118, "Gladius"},
-            {119, "Cutlass"},
-            {120, "Shamshir"},
-            {121, "Tulwar"},
-            {122, "Dimensional Blade"},
-            {123, "Battle Sword"},
-            {124, "Rune Sword"},
-            {125, "Ancient Sword"},
-            {126, "Espandon"},
-            {127, "Dacian Falx"},
-            {128, "Tusk Sword"},
-            {129, "Gothic Sword"},
-            {130, "Zweihander"},
-            {131, "Executioner Sword"},
-            {132, "Poignard"},
-            {133, "Rondel"},
-            {134, "Cinquedeas"},
-            {135, "Stilleto"},
-            {136, "Battle Dart"},
-            {137, "Francisca"},
-            {138, "War Dart"},
-            {139, "Hurlbat"},
-            {140, "War Javelin"},
-            {141, "Great Pilum"},
-            {142, "Simbilan"},
-            {143, "Spiculum"},
-            {144, "Harpoon"},
-            {145, "War Spear"},
-            {146, "Fuscina"},
-            {147, "War Fork"},
-            {148, "Yari"},
-            {149, "Lance"},
-            {150, "Lochaber Axe"},
-            {151, "Bill"},
-            {152, "Battle Scythe"},
-            {153, "Partizan"},
-            {154, "Bec-de-Corbin"},
-            {155, "Grim Scythe"},
-            {156, "Jo Staff"},
-            {157, "Quarterstaff"},
-            {158, "Cedar Staff"},
-            {159, "Gothic Staff"},
-            {160, "Rune Staff"},
-            {161, "Edge Bow"},
-            {162, "Razor Bow"},
-            {163, "Cedar Bow"},
-            {164, "Double Bow"},
-            {165, "Short Siege Bow"},
-            {166, "Long Siege Bow"},
-            {167, "Rune Bow"},
-            {168, "Gothic Bow"},
-            {169, "Arbalest"},
-            {170, "Siege Crossbow"},
-            {171, "Ballista"},
-            {172, "Chu-Ko-Nu"},
-            {173, "Khalim's Flail"},
-            {174, "Khalim's Will"},
-            {175, "Katar"},
-            {176, "Wrist Blade"},
-            {177, "Hatchet Hands"},
-            {178, "Cestus"},
-            {179, "Claws"},
-            {180, "Blade Talons"},
-            {181, "Scissors Katar"},
-            {182, "Quhab"},
-            {183, "Wrist Spike"},
-            {184, "Fascia"},
-            {185, "Hand Scythe"},
-            {186, "Greater Claws"},
-            {187, "Greater Talons"},
-            {188, "Scissors Quhab"},
-            {189, "Suwayyah"},
-            {190, "Wrist Sword"},
-            {191, "War Fist"},
-            {192, "Battle Cestus"},
-            {193, "Feral Claws"},
-            {194, "Runic Talons"},
-            {195, "Scissors Suwayyah"},
-            {196, "Tomahawk"},
-            {197, "Small Crescent"},
-            {198, "Ettin Axe"},
-            {199, "War Spike"},
-            {200, "Berserker Axe"},
-            {201, "Feral Axe"},
-            {202, "Silver-edged Axe"},
-            {203, "Decapitator"},
-            {204, "Champion Axe"},
-            {205, "Glorious Axe"},
-            {206, "Polished Wand"},
-            {207, "Ghost Wand"},
-            {208, "Lich Wand"},
-            {209, "Unearthed Wand"},
-            {210, "Truncheon"},
-            {211, "Mighty Scepter"},
-            {212, "Seraph Rod"},
-            {213, "Caduceus"},
-            {214, "Tyrant Club"},
-            {215, "Reinforced Mace"},
-            {216, "Devil Star"},
-            {217, "Scourge"},
-            {218, "Legendary Mallet"},
-            {219, "Ogre Maul"},
-            {220, "Thunder Maul"},
-            {221, "Falcata"},
-            {222, "Ataghan"},
-            {223, "Elegant Blade"},
-            {224, "Hydra Edge"},
-            {225, "Phase Blade"},
-            {226, "Conquest Sword"},
-            {227, "Cryptic Sword"},
-            {228, "Mythical Sword"},
-            {229, "Legend Sword"},
-            {230, "Highland Blade"},
-            {231, "Balrog Blade"},
-            {232, "Champion Sword"},
-            {233, "Colossal Sword"},
-            {234, "Colossus Blade"},
-            {235, "Bone Knife"},
-            {236, "Mithral Point"},
-            {237, "Fanged Knife"},
-            {238, "Legend Spike"},
-            {239, "Flying Knife"},
-            {240, "Flying Axe"},
-            {241, "Winged Knife"},
-            {242, "Winged Axe"},
-            {243, "Hyperion Javelin"},
-            {244, "Stygian Pilum"},
-            {245, "Balrog Spear"},
-            {246, "Ghost Glaive"},
-            {247, "Winged Harpoon"},
-            {248, "Hyperion Spear"},
-            {249, "Stygian Pike"},
-            {250, "Mancatcher"},
-            {251, "Ghost Spear"},
-            {252, "War Pike"},
-            {253, "Ogre Axe"},
-            {254, "Colossus Voulge"},
-            {255, "Thresher"},
-            {256, "Cryptic Axe"},
-            {257, "Great Poleaxe"},
-            {258, "Giant Thresher"},
-            {259, "Walking Stick"},
-            {260, "Stalagmite"},
-            {261, "Elder Staff"},
-            {262, "Shillelagh"},
-            {263, "Archon Staff"},
-            {264, "Spider Bow"},
-            {265, "Blade Bow"},
-            {266, "Shadow Bow"},
-            {267, "Great Bow"},
-            {268, "Diamond Bow"},
-            {269, "Crusader Bow"},
-            {270, "Ward Bow"},
-            {271, "Hydra Bow"},
-            {272, "Pellet Bow"},
-            {273, "Gorgon Crossbow"},
-            {274, "Colossus Crossbow"},
-            {275, "Demon Crossbow"},
-            {276, "Eagle Orb"},
-            {277, "Sacred Globe"},
-            {278, "Smoked Sphere"},
-            {279, "Clasped Orb"},
-            {280, "Jared's Stone"},
-            {281, "Stag Bow"},
-            {282, "Reflex Bow"},
-            {283, "Maiden Spear"},
-            {284, "Maiden Pike"},
-            {285, "Maiden Javelin"},
-            {286, "Glowing Orb"},
-            {287, "Crystalline Globe"},
-            {288, "Cloudy Sphere"},
-            {289, "Sparkling Ball"},
-            {290, "Swirling Crystal"},
-            {291, "Ashwood Bow"},
-            {292, "Ceremonial Bow"},
-            {293, "Ceremonial Spear"},
-            {294, "Ceremonial Pike"},
-            {295, "Ceremonial Javelin"},
-            {296, "Heavenly Stone"},
-            {297, "Eldritch Orb"},
-            {298, "Demon Heart"},
-            {299, "Vortex Orb"},
-            {300, "Dimensional Shard"},
-            {301, "Matriarchal Bow"},
-            {302, "Grand Matron Bow"},
-            {303, "Matriarchal Spear"},
-            {304, "Matriarchal Pike"},
-            {305, "Matriarchal Javelin"},
-            {306, "Cap"},
-            {307, "Skull Cap"},
-            {308, "Helm"},
-            {309, "Full Helm"},
-            {310, "Great Helm"},
-            {311, "Crown"},
-            {312, "Mask"},
-            {313, "Quilted Armor"},
-            {314, "Leather Armor"},
-            {315, "Hard Leather Armor"},
-            {316, "Studded Leather"},
-            {317, "Ring Mail"},
-            {318, "Scale Mail"},
-            {319, "Chain Mail"},
-            {320, "Breast Plate"},
-            {321, "Splint Mail"},
-            {322, "Plate Mail"},
-            {323, "Field Plate"},
-            {324, "Gothic Plate"},
-            {325, "Full Plate Mail"},
-            {326, "Ancient Armor"},
-            {327, "Light Plate"},
-            {328, "Buckler"},
-            {329, "Small Shield"},
-            {330, "Large Shield"},
-            {331, "Kite Shield"},
-            {332, "Tower Shield"},
-            {333, "Gothic Shield"},
-            {334, "Leather Gloves"},
-            {335, "Heavy Gloves"},
-            {336, "Chain Gloves"},
-            {337, "Light Gauntlets"},
-            {338, "Gauntlets"},
-            {339, "Boots"},
-            {340, "Heavy Boots"},
-            {341, "Chain Boots"},
-            {342, "Light Plated Boots"},
-            {343, "Greaves"},
-            {344, "Sash"},
-            {345, "Light Belt"},
-            {346, "Belt"},
-            {347, "Heavy Belt"},
-            {348, "Plated Belt"},
-            {349, "Bone Helm"},
-            {350, "Bone Shield"},
-            {351, "Spiked Shield"},
-            {352, "War Hat"},
-            {353, "Sallet"},
-            {354, "Casque"},
-            {355, "Basinet"},
-            {356, "Winged Helm"},
-            {357, "Grand Crown"},
-            {358, "Death Mask"},
-            {359, "Ghost Armor"},
-            {360, "Serpentskin Armor"},
-            {361, "Demonhide Armor"},
-            {362, "Trellised Armor"},
-            {363, "Linked Mail"},
-            {364, "Tigulated Mail"},
-            {365, "Mesh Armor"},
-            {366, "Cuirass"},
-            {367, "Russet Armor"},
-            {368, "Templar Coat"},
-            {369, "Sharktooth Armor"},
-            {370, "Embossed Plate"},
-            {371, "Chaos Armor"},
-            {372, "Ornate Armor"},
-            {373, "Mage Plate"},
-            {374, "Defender"},
-            {375, "Round Shield"},
-            {376, "Scutum"},
-            {377, "Dragon Shield"},
-            {378, "Pavise"},
-            {379, "Ancient Shield"},
-            {380, "Demonhide Gloves"},
-            {381, "Sharkskin Gloves"},
-            {382, "Heavy Bracers"},
-            {383, "Battle Gauntlets"},
-            {384, "War Gauntlets"},
-            {385, "Demonhide Boots"},
-            {386, "Sharkskin Boots"},
-            {387, "Mesh Boots"},
-            {388, "Battle Boots"},
-            {389, "War Boots"},
-            {390, "Demonhide Sash"},
-            {391, "Sharkskin Belt"},
-            {392, "Mesh Belt"},
-            {393, "Battle Belt"},
-            {394, "War Belt"},
-            {395, "Grim Helm"},
-            {396, "Grim Shield"},
-            {397, "Barbed Shield"},
-            {398, "Wolf Head"},
-            {399, "Hawk Helm"},
-            {400, "Antlers"},
-            {401, "Falcon Mask"},
-            {402, "Spirit Mask"},
-            {403, "Jawbone Cap"},
-            {404, "Fanged Helm"},
-            {405, "Horned Helm"},
-            {406, "Assault Helmet"},
-            {407, "Avenger Guard"},
-            {408, "Targe"},
-            {409, "Rondache"},
-            {410, "Heraldic Shield"},
-            {411, "Aerin Shield"},
-            {412, "Crown Shield"},
-            {413, "Preserved Head"},
-            {414, "Zombie Head"},
-            {415, "Unraveller Head"},
-            {416, "Gargoyle Head"},
-            {417, "Demon Head"},
-            {418, "Circlet"},
-            {419, "Coronet"},
-            {420, "Tiara"},
-            {421, "Diadem"},
-            {422, "Shako"},
-            {423, "Hydraskull"},
-            {424, "Armet"},
-            {425, "Giant Conch"},
-            {426, "Spired Helm"},
-            {427, "Corona"},
-            {428, "Demonhead"},
-            {429, "Dusk Shroud"},
-            {430, "Wyrmhide"},
-            {431, "Scarab Husk"},
-            {432, "Wire Fleece"},
-            {433, "Diamond Mail"},
-            {434, "Loricated Mail"},
-            {435, "Boneweave"},
-            {436, "Great Hauberk"},
-            {437, "Balrog Skin"},
-            {438, "Hellforge Plate"},
-            {439, "Kraken Shell"},
-            {440, "Lacquered Plate"},
-            {441, "Shadow Plate"},
-            {442, "Sacred Armor"},
-            {443, "Archon Plate"},
-            {444, "Heater"},
-            {445, "Luna"},
-            {446, "Hyperion"},
-            {447, "Monarch"},
-            {448, "Aegis"},
-            {449, "Ward"},
-            {450, "Bramble Mitts"},
-            {451, "Vampirebone Gloves"},
-            {452, "Vambraces"},
-            {453, "Crusader Gauntlets"},
-            {454, "Ogre Gauntlets"},
-            {455, "Wyrmhide Boots"},
-            {456, "Scarabshell Boots"},
-            {457, "Boneweave Boots"},
-            {458, "Mirrored Boots"},
-            {459, "Myrmidon Greaves"},
-            {460, "Spiderweb Sash"},
-            {461, "Vampirefang Belt"},
-            {462, "Mithril Coil"},
-            {463, "Troll Belt"},
-            {464, "Colossus Girdle"},
-            {465, "Bone Visage"},
-            {466, "Troll Nest"},
-            {467, "Blade Barrier"},
-            {468, "Alpha Helm"},
-            {469, "Griffon Headress"},
-            {470, "Hunter's Guise"},
-            {471, "Sacred Feathers"},
-            {472, "Totemic Mask"},
-            {473, "Jawbone Visor"},
-            {474, "Lion Helm"},
-            {475, "Rage Mask"},
-            {476, "Savage Helmet"},
-            {477, "Slayer Guard"},
-            {478, "Akaran Targe"},
-            {479, "Akaran Rondache"},
-            {480, "Protector Shield"},
-            {481, "Gilded Shield"},
-            {482, "Royal Shield"},
-            {483, "Mummified Trophy"},
-            {484, "Fetish Trophy"},
-            {485, "Sexton Trophy"},
-            {486, "Cantor Trophy"},
-            {487, "Heirophant Trophy"},
-            {488, "Blood Spirit"},
-            {489, "Sun Spirit"},
-            {490, "Earth Spirit"},
-            {491, "Sky Spirit"},
-            {492, "Dream Spirit"},
-            {493, "Carnage Helm"},
-            {494, "Fury Visor"},
-            {495, "Destroyer Helm"},
-            {496, "Conqueror Crown"},
-            {497, "Guardian Crown"},
-            {498, "Sacred Targe"},
-            {499, "Sacred Rondache"},
-            {500, "Ancient Shield"},
-            {501, "Zakarum Shield"},
-            {502, "Vortex Shield"},
-            {503, "Minion Skull"},
-            {504, "Hellspawn Skull"},
-            {505, "Overseer Skull"},
-            {506, "Succubus Skull"},
-            {507, "Bloodlord Skull"},
-            {508, "Elixir"},
-            {509, "Healing Potion"},
-            {510, "Mana Potion"},
-            {511, "Full Healing Potion"},
-            {512, "Full Mana Potion"},
-            {513, "Stamina Potion"},
-            {514, "Antidote Potion"},
-            {515, "Rejuvenation Potion"},
-            {516, "Full Rejuvenation Potion"},
-            {517, "Thawing Potion"},
-            {518, "Tome of Town Portal"},
-            {519, "Tome of Identify"},
-            {520, "Amulet"},
-            {521, "Amulet of the Viper"},
-            {522, "Ring"},
-            {523, "Gold"},
-            {524, "Scroll of Inifuss"},
-            {525, "Key to the Cairn Stones"},
-            {526, "Arrows"},
-            {527, "Torch"},
-            {528, "Bolts"},
-            {529, "Scroll of Town Portal"},
-            {530, "Scroll of Identify"},
-            {531, "Heart"},
-            {532, "Brain"},
-            {533, "Jawbone"},
-            {534, "Eye"},
-            {535, "Horn"},
-            {536, "Tail"},
-            {537, "Flag"},
-            {538, "Fang"},
-            {539, "Quill"},
-            {540, "Soul"},
-            {541, "Scalp"},
-            {542, "Spleen"},
-            {543, "Key"},
-            {544, "The Black Tower Key"},
-            {545, "Potion of Life"},
-            {546, "A Jade Figurine"},
-            {547, "The Golden Bird"},
-            {548, "Lam Esen's Tome"},
-            {549, "Horadric Cube"},
-            {550, "Horadric Scroll"},
-            {551, "Mephisto's Soulstone"},
-            {552, "Book of Skill"},
-            {553, "Khalim's Eye"},
-            {554, "Khalim's Heart"},
-            {555, "Khalim's Brain"},
-            {556, "Ear"},
-            {557, "Chipped Amethyst"},
-            {558, "Flawed Amethyst"},
-            {559, "Amethyst"},
-            {560, "Flawless Amethyst"},
-            {561, "Perfect Amethyst"},
-            {562, "Chipped Topaz"},
-            {563, "Flawed Topaz"},
-            {564, "Topaz"},
-            {565, "Flawless Topaz"},
-            {566, "Perfect Topaz"},
-            {567, "Chipped Sapphire"},
-            {568, "Flawed Sapphire"},
-            {569, "Sapphire"},
-            {570, "Flawless Sapphire"},
-            {571, "Perfect Sapphire"},
-            {572, "Chipped Emerald"},
-            {573, "Flawed Emerald"},
-            {574, "Emerald"},
-            {575, "Flawless Emerald"},
-            {576, "Perfect Emerald"},
-            {577, "Chipped Ruby"},
-            {578, "Flawed Ruby"},
-            {579, "Ruby"},
-            {580, "Flawless Ruby"},
-            {581, "Perfect Ruby"},
-            {582, "Chipped Diamond"},
-            {583, "Flawed Diamond"},
-            {584, "Diamond"},
-            {585, "Flawless Diamond"},
-            {586, "Perfect Diamond"},
-            {587, "Minor Healing Potion"},
-            {588, "Light Healing Potion"},
-            {589, "Healing Potion"},
-            {590, "Greater Healing Potion"},
-            {591, "Super Healing Potion"},
-            {592, "Minor Mana Potion"},
-            {593, "Light Mana Potion"},
-            {594, "Mana Potion"},
-            {595, "Greater Mana Potion"},
-            {596, "Super Mana Potion"},
-            {597, "Chipped Skull"},
-            {598, "Flawed Skull"},
-            {599, "Skull"},
-            {600, "Flawless Skull"},
-            {601, "Perfect Skull"},
-            {602, "Herb"},
-            {603, "Small Charm"},
-            {604, "Large Charm"},
-            {605, "Grand Charm"},
-            {606, "Small Red Potion"},
-            {607, "Large Red Potion"},
-            {608, "Small Blue Potion"},
-            {609, "Large Blue Potion"},
-            {610, "El Rune"},
-            {611, "Eld Rune"},
-            {612, "Tir Rune"},
-            {613, "Nef Rune"},
-            {614, "Eth Rune"},
-            {615, "Ith Rune"},
-            {616, "Tal Rune"},
-            {617, "Ral Rune"},
-            {618, "Ort Rune"},
-            {619, "Thul Rune"},
-            {620, "Amn Rune"},
-            {621, "Sol Rune"},
-            {622, "Shael Rune"},
-            {623, "Dol Rune"},
-            {624, "Hel Rune"},
-            {625, "Io Rune"},
-            {626, "Lum Rune"},
-            {627, "Ko Rune"},
-            {628, "Fal Rune"},
-            {629, "Lem Rune"},
-            {630, "Pul Rune"},
-            {631, "Um Rune"},
-            {632, "Mal Rune"},
-            {633, "Ist Rune"},
-            {634, "Gul Rune"},
-            {635, "Vex Rune"},
-            {636, "Ohm Rune"},
-            {637, "Lo Rune"},
-            {638, "Sur Rune"},
-            {639, "Ber Rune"},
-            {640, "Jah Rune"},
-            {641, "Cham Rune"},
-            {642, "Zod Rune"},
-            {643, "Jewel"},
-            {644, "Malah's Potion"},
-            {645, "Scroll of Knowledge"},
-            {646, "Scroll of Resistance"},
-            {647, "Key of Terror"},
-            {648, "Key of Hate"},
-            {649, "Key of Destruction"},
-            {650, "Diablo's Horn"},
-            {651, "Baal's Eye"},
-            {652, "Mephisto's Brain"},
-            {653, "Token of Absolution"},
-            {654, "Twisted Essence of Suffering"},
-            {655, "Charged Essense of Hatred"},
-            {656, "Burning Essence of Terror"},
-            {657, "Festering Essence of Destruction"},
-            {658, "Standard of Heroes"}
+            [Item.ClassAxes] = new Item[] { Item.HandAxe, Item.Axe, Item.DoubleAxe, Item.MilitaryPick, Item.WarAxe, Item.LargeAxe, Item.BroadAxe, Item.BattleAxe, Item.GreatAxe, Item.GiantAxe, Item.Hatchet, Item.Cleaver, Item.TwinAxe, Item.Crowbill, Item.Naga, Item.MilitaryAxe, Item.BeardedAxe, Item.Tabar, Item.GothicAxe, Item.AncientAxe, Item.Tomahawk, Item.SmallCrescent, Item.EttinAxe, Item.WarSpike, Item.BerserkerAxe, Item.FeralAxe, Item.SilverEdgedAxe, Item.Decapitator, Item.ChampionAxe, Item.GloriousAxe },
+            [Item.ClassWands] = new Item[] { Item.Wand, Item.YewWand, Item.BoneWand, Item.GrimWand, Item.BurntWand, Item.PetrifiedWand, Item.TombWand, Item.GraveWand, Item.PolishedWand, Item.GhostWand, Item.LichWand, Item.UnearthedWand },
+            [Item.ClassClubs] = new Item[] { Item.Club, Item.SpikedClub, Item.Cudgel, Item.BarbedClub, Item.Truncheon, Item.TyrantClub },
+            [Item.ClassScepters] = new Item[] { Item.Scepter, Item.GrandScepter, Item.WarScepter, Item.RuneScepter, Item.HolyWaterSprinkler, Item.DivineScepter, Item.MightyScepter, Item.SeraphRod, Item.Caduceus },
+            [Item.ClassMaces] = new Item[] { Item.Mace, Item.MorningStar, Item.Flail, Item.FlangedMace, Item.JaggedStar, Item.Knout, Item.ReinforcedMace, Item.DevilStar, Item.Scourge },
+            [Item.ClassHammers] = new Item[] { Item.WarHammer, Item.Maul, Item.GreatMaul, Item.BattleHammer, Item.WarClub, Item.MartelDeFer, Item.LegendaryMallet, Item.OgreMaul, Item.ThunderMaul },
+            [Item.ClassSwords] = new Item[] { Item.ShortSword, Item.Scimitar, Item.Sabre, Item.Falchion, Item.CrystalSword, Item.BroadSword, Item.LongSword, Item.WarSword, Item.TwoHandedSword, Item.Claymore, Item.GiantSword, Item.BastardSword, Item.Flamberge, Item.GreatSword, Item.Gladius, Item.Cutlass, Item.Shamshir, Item.Tulwar, Item.DimensionalBlade, Item.BattleSword, Item.RuneSword, Item.AncientSword, Item.Espandon, Item.DacianFalx, Item.TuskSword, Item.GothicSword, Item.Zweihander, Item.ExecutionerSword, Item.Falcata, Item.Ataghan, Item.ElegantBlade, Item.HydraEdge, Item.PhaseBlade, Item.ConquestSword, Item.CrypticSword, Item.MythicalSword, Item.LegendSword, Item.HighlandBlade, Item.BalrogBlade, Item.ChampionSword, Item.ColossusSword, Item.ColossusBlade },
+            [Item.ClassDaggers] = new Item[] { Item.Dagger, Item.Dirk, Item.Kris, Item.Blade, Item.Poignard, Item.Rondel, Item.Cinquedeas, Item.Stiletto, Item.BoneKnife, Item.MithrilPoint, Item.FangedKnife, Item.LegendSpike },
+            [Item.ClassThrowingKnifes] = new Item[] { Item.ThrowingKnife, Item.BalancedKnife, Item.BattleDart, Item.WarDart, Item.FlyingKnife, Item.WingedKnife },
+            [Item.ClassThrowingAxes] = new Item[] { Item.ThrowingAxe, Item.BalancedAxe, Item.Francisca, Item.Hurlbat, Item.FlyingAxe, Item.WingedAxe },
+            [Item.ClassJavelins] = new Item[] { Item.Javelin, Item.Pilum, Item.ShortSpear, Item.Glaive, Item.ThrowingSpear, Item.WarJavelin, Item.GreatPilum, Item.Simbilan, Item.Spiculum, Item.Harpoon, Item.HyperionJavelin, Item.StygianPilum, Item.BalrogSpear, Item.GhostGlaive, Item.WingedHarpoon },
+            [Item.ClassSpears] = new Item[] { Item.Spear, Item.Trident, Item.Brandistock, Item.Spetum, Item.Pike, Item.WarSpear, Item.Fuscina, Item.WarFork, Item.Yari, Item.Lance, Item.HyperionSpear, Item.StygianPike, Item.Mancatcher, Item.GhostSpear, Item.WarPike },
+            [Item.ClassPolearms] = new Item[] { Item.Bardiche, Item.Voulge, Item.Scythe, Item.Poleaxe, Item.Halberd, Item.WarScythe, Item.LochaberAxe, Item.Bill, Item.BattleScythe, Item.Partizan, Item.BecDeCorbin, Item.GrimScythe, Item.OgreAxe, Item.ColossusVoulge, Item.Thresher, Item.CrypticAxe, Item.GreatPoleaxe, Item.GiantThresher },
+            [Item.ClassStaves] = new Item[] { Item.ShortStaff, Item.LongStaff, Item.GnarledStaff, Item.BattleStaff, Item.WarStaff, Item.JoStaff, Item.QuarterStaff, Item.CedarStaff, Item.GothicStaff, Item.RuneStaff, Item.WalkingStick, Item.Stalagmite, Item.ElderStaff, Item.Shillelagh, Item.ArchonStaff },
+            [Item.ClassBows] = new Item[] { Item.ShortBow, Item.HuntersBow, Item.LongBow, Item.CompositeBow, Item.ShortBattleBow, Item.LongBattleBow, Item.ShortWarBow, Item.LongWarBow, Item.EdgeBow, Item.RazorBow, Item.CedarBow, Item.DoubleBow, Item.ShortSiegeBow, Item.LargeSiegeBow, Item.RuneBow, Item.GothicBow, Item.SpiderBow, Item.BladeBow, Item.ShadowBow, Item.GreatBow, Item.DiamondBow, Item.CrusaderBow, Item.WardBow, Item.HydraBow },
+            [Item.ClassCrossbows] = new Item[] { Item.LightCrossbow, Item.Crossbow, Item.HeavyCrossbow, Item.RepeatingCrossbow, Item.Arbalest, Item.SiegeCrossbow, Item.Ballista, Item.ChuKoNu, Item.PelletBow, Item.GorgonCrossbow, Item.ColossusCrossbow, Item.DemonCrossBow },
+
+            [Item.ClassHelms] = new Item[] { Item.Cap, Item.SkullCap, Item.Helm, Item.FullHelm, Item.GreatHelm, Item.Crown, Item.Mask, Item.BoneHelm, Item.WarHat, Item.Sallet, Item.Casque, Item.Basinet, Item.WingedHelm, Item.GrandCrown, Item.DeathMask, Item.GrimHelm, Item.Shako, Item.Hydraskull, Item.Armet, Item.GiantConch, Item.SpiredHelm, Item.Corona, Item.DemonHead, Item.BoneVisage },
+            [Item.ClassArmors] = new Item[] { Item.QuiltedArmor, Item.LeatherArmor, Item.HardLeatherArmor, Item.StuddedLeather, Item.RingMail, Item.ScaleMail, Item.ChainMail, Item.BreastPlate, Item.SplintMail, Item.PlateMail, Item.FieldPlate, Item.GothicPlate, Item.FullPlateMail, Item.AncientArmor, Item.LightPlate, Item.GhostArmor, Item.SerpentskinArmor, Item.DemonhideArmor, Item.TrellisedArmor, Item.LinkedMail, Item.TigulatedMail, Item.MeshArmor, Item.Cuirass, Item.RussetArmor, Item.TemplarCoat, Item.SharktoothArmor, Item.EmbossedPlate, Item.ChaosArmor, Item.OrnatePlate, Item.MagePlate, Item.DuskShroud, Item.Wyrmhide, Item.ScarabHusk, Item.WireFleece, Item.DiamondMail, Item.LoricatedMail, Item.Boneweave, Item.GreatHauberk, Item.BalrogSkin, Item.HellforgePlate, Item.KrakenShell, Item.LacqueredPlate, Item.ShadowPlate, Item.SacredArmor, Item.ArchonPlate },
+            [Item.ClassShields] = new Item[] { Item.Buckler, Item.SmallShield, Item.LargeShield, Item.KiteShield, Item.TowerShield, Item.GothicShield, Item.BoneShield, Item.SpikedShield, Item.Defender, Item.RoundShield, Item.Scutum, Item.DragonShield, Item.Pavise, Item.AncientShield, Item.GrimShield, Item.BarbedShield, Item.Heater, Item.Luna, Item.Hyperion, Item.Monarch, Item.Aegis, Item.Ward, Item.TrollNest, Item.BladeBarrier },
+            [Item.ClassGloves] = new Item[] { Item.LeatherGloves, Item.HeavyGloves, Item.ChainGloves, Item.LightGauntlets, Item.Gauntlets, Item.DemonhideGloves, Item.SharkskinGloves, Item.HeavyBracers, Item.BattleGauntlets, Item.WarGauntlets, Item.BrambleMitts, Item.VampireboneGloves, Item.Vambraces, Item.CrusaderGauntlets, Item.OgreGauntlets },
+            [Item.ClassBoots] = new Item[] { Item.Boots, Item.HeavyBoots, Item.ChainBoots, Item.LightPlatedBoots, Item.Greaves, Item.DemonhideBoots, Item.SharkskinBoots, Item.MeshBoots, Item.BattleBoots, Item.WarBoots, Item.WyrmhideBoots, Item.ScarabshellBoots, Item.BoneweaveBoots, Item.MirroredBoots, Item.MyrmidonGreaves },
+            [Item.ClassBelts] = new Item[] { Item.Sash, Item.LightBelt, Item.Belt, Item.HeavyBelt, Item.PlatedBelt, Item.DemonhideSash, Item.SharkskinBelt, Item.MeshBelt, Item.BattleBelt, Item.WarBelt, Item.SpiderwebSash, Item.VampirefangBelt, Item.MithrilCoil, Item.TrollBelt, Item.ColossusGirdle },
+            [Item.ClassCirclets] = new Item[] { Item.Circlet, Item.Coronet, Item.Tiara, Item.Diadem },
+
+            [Item.ClassAssassinKatars] = new Item[] { Item.Katar, Item.WristBlade, Item.HatchetHands, Item.Cestus, Item.Claws, Item.BladeTalons, Item.ScissorsKatar, Item.Quhab, Item.WristSpike, Item.Fascia, Item.HandScythe, Item.GreaterClaws, Item.GreaterTalons, Item.ScissorsQuhab, Item.Suwayyah, Item.WristSword, Item.WarFist, Item.BattleCestus, Item.FeralClaws, Item.RunicTalons, Item.ScissorsSuwayyah },
+            [Item.ClassSorceressOrbs] = new Item[] { Item.EagleOrb, Item.SacredGlobe, Item.SmokedSphere, Item.ClaspedOrb, Item.JaredsStone, Item.GlowingOrb, Item.CrystallineGlobe, Item.CloudySphere, Item.SparklingBall, Item.SwirlingCrystal, Item.HeavenlyStone, Item.EldritchOrb, Item.DemonHeart, Item.VortexOrb, Item.DimensionalShard },
+            [Item.ClassAmazonBows] = new Item[] { Item.StagBow, Item.ReflexBow, Item.AshwoodBow, Item.CeremonialBow, Item.MatriarchalBow, Item.GrandMatronBow },
+            [Item.ClassAmazonSpears] = new Item[] { Item.MaidenSpear, Item.MaidenPike, Item.CeremonialSpear, Item.CeremonialPike, Item.MatriarchalSpear, Item.MatriarchalPike },
+            [Item.ClassAmazonJavelins] = new Item[] { Item.MaidenJavelin, Item.CeremonialJavelin, Item.MatriarchalJavelin },
+            [Item.ClassDruidHelms] = new Item[] { Item.WolfHead, Item.HawkHelm, Item.Antlers, Item.FalconMask, Item.SpiritMask, Item.AlphaHelm, Item.GriffonHeaddress, Item.HuntersGuise, Item.SacredFeathers, Item.TotemicMask, Item.BloodSpirit, Item.SunSpirit, Item.EarthSpirit, Item.SkySpirit, Item.DreamSpirit },
+            [Item.ClassBarbarianHelms] = new Item[] { Item.JawboneCap, Item.FangedHelm, Item.HornedHelm, Item.AssaultHelmet, Item.AvengerGuard, Item.JawboneVisor, Item.LionHelm, Item.RageMask, Item.SavageHelmet, Item.SlayerGuard, Item.CarnageHelm, Item.FuryVisor, Item.DestroyerHelm, Item.ConquerorCrown, Item.GuardianCrown },
+            [Item.ClassPaladinShields] = new Item[] { Item.Targe, Item.Rondache, Item.HeraldicShield, Item.AerinShield, Item.CrownShield, Item.AkaranTarge, Item.AkaranRondache, Item.ProtectorShield, Item.GildedShield, Item.RoyalShield, Item.SacredTarge, Item.SacredRondache, Item.KurastShield, Item.ZakarumShield, Item.VortexShield },
+            [Item.ClassNecromancerShields] = new Item[] { Item.PreservedHead, Item.ZombieHead, Item.UnravellerHead, Item.GargoyleHead, Item.DemonHeadShield, Item.MummifiedTrophy, Item.FetishTrophy, Item.SextonTrophy, Item.CantorTrophy, Item.HierophantTrophy, Item.MinionSkull, Item.HellspawnSkull, Item.OverseerSkull, Item.SuccubusSkull, Item.BloodlordSkull },
         };
+    }
+
+    public class ItemLogEntry
+    {
+        public string Text => Items.ItemLogDisplayName(UnitItem, Rule);
+        public Color Color { get; set; }
+        public DateTime LogDate { get; private set; } = DateTime.Now;
+        public bool ItemLogExpired => DateTime.Now.Subtract(LogDate).TotalSeconds > MapAssistConfiguration.Loaded.ItemLog.DisplayForSeconds;
+        public string ItemHashString { get; set; }
+        public UnitItem UnitItem { get; set; }
+        public ItemFilter Rule { get; set; }
+    }
+
+    public static class ItemExtensions
+    {
+        public static bool IsHealthPotion(this Item item) => item >= Item.MinorHealingPotion && item <= Item.SuperHealingPotion;
+
+        public static bool IsManaPotion(this Item item) => item >= Item.MinorManaPotion && item <= Item.SuperManaPotion;
+
+        public static bool IsRejuvPotion(this Item item) => item >= Item.RejuvenationPotion && item <= Item.FullRejuvenationPotion;
+
+        public static bool IsTopTierPotion(this Item item) => new Item[] { Item.SuperHealingPotion, Item.SuperManaPotion, Item.FullRejuvenationPotion }.Contains(item);
+    }
+
+    [Flags]
+    public enum ItemFlags : uint
+    {
+        IFLAG_NEWITEM = 0x00000001,
+        IFLAG_TARGET = 0x00000002,
+        IFLAG_TARGETING = 0x00000004,
+        IFLAG_DELETED = 0x00000008,
+        IFLAG_IDENTIFIED = 0x00000010,
+        IFLAG_QUANTITY = 0x00000020,
+        IFLAG_SWITCHIN = 0x00000040,
+        IFLAG_SWITCHOUT = 0x00000080,
+        IFLAG_BROKEN = 0x00000100,
+        IFLAG_REPAIRED = 0x00000200,
+        IFLAG_UNK1 = 0x00000400,
+        IFLAG_SOCKETED = 0x00000800,
+        IFLAG_NOSELL = 0x00001000,
+        IFLAG_INSTORE = 0x00002000,
+        IFLAG_NOEQUIP = 0x00004000,
+        IFLAG_NAMED = 0x00008000,
+        IFLAG_ISEAR = 0x00010000,
+        IFLAG_STARTITEM = 0x00020000,
+        IFLAG_UNK2 = 0x00040000,
+        IFLAG_INIT = 0x00080000,
+        IFLAG_UNK3 = 0x00100000,
+        IFLAG_COMPACTSAVE = 0x00200000,
+        IFLAG_ETHEREAL = 0x00400000,
+        IFLAG_JUSTSAVED = 0x00800000,
+        IFLAG_PERSONALIZED = 0x01000000,
+        IFLAG_LOWQUALITY = 0x02000000,
+        IFLAG_RUNEWORD = 0x04000000,
+        IFLAG_ITEM = 0x08000000
+    }
+
+    public enum ItemQuality : uint
+    {
+        INFERIOR = 0x01, //0x01 Inferior
+        NORMAL = 0x02, //0x02 Normal
+        SUPERIOR = 0x03, //0x03 Superior
+        MAGIC = 0x04, //0x04 Magic
+        SET = 0x05, //0x05 Set
+        RARE = 0x06, //0x06 Rare
+        UNIQUE = 0x07, //0x07 Unique
+        CRAFT = 0x08, //0x08 Crafted
+        TEMPERED = 0x09 //0x09 Tempered
+    }
+
+    public enum InvPage : byte
+    {
+        INVENTORY = 0,
+        EQUIP = 1,
+        TRADE = 2,
+        CUBE = 3,
+        STASH = 4,
+        BELT = 5,
+        NULL = 255,
+    }
+
+    public enum StashType : byte
+    {
+        Body = 0,
+        Personal = 1,
+        Shared1 = 2,
+        Shared2 = 3,
+        Shared3 = 4,
+        Belt = 5
+    }
+
+    public enum BodyLoc : byte
+    {
+        NONE, //Not Equipped
+        HEAD, //Helm
+        NECK, //Amulet
+        TORSO, //Body Armor
+        RARM, //Right-Hand
+        LARM, //Left-Hand
+        RRIN, //Right Ring
+        LRIN, //Left Ring
+        BELT, //Belt
+        FEET, //Boots
+        GLOVES, //Gloves
+        SWRARM, //Right-Hand on Switch
+        SWLARM //Left-Hand on Switch
+    };
+
+    public enum ItemMode : uint
+    {
+        STORED, //Item is in Storage (inventory, cube, Stash?)
+        EQUIP, //Item is Equippped
+        INBELT, //Item is in Belt Rows
+        ONGROUND, //Item is on Ground
+        ONCURSOR, //Item is on Cursor
+        DROPPING, //Item is Being Dropped
+        SOCKETED //Item is Socketed in another Item
+    };
+
+    public enum ItemModeMapped // Provides more detail over ItemMode
+    {
+        Player,
+        Inventory,
+        Belt,
+        Cube,
+        Stash,
+        Vendor,
+        Trade,
+        Mercenary,
+        Socket,
+        Ground,
+        Selected,
+        Unknown
+    };
+
+    public enum Item : uint
+    {
+        HandAxe,
+        Axe,
+        DoubleAxe,
+        MilitaryPick,
+        WarAxe,
+        LargeAxe,
+        BroadAxe,
+        BattleAxe,
+        GreatAxe,
+        GiantAxe,
+        Wand,
+        YewWand,
+        BoneWand,
+        GrimWand,
+        Club,
+        Scepter,
+        GrandScepter,
+        WarScepter,
+        SpikedClub,
+        Mace,
+        MorningStar,
+        Flail,
+        WarHammer,
+        Maul,
+        GreatMaul,
+        ShortSword,
+        Scimitar,
+        Sabre,
+        Falchion,
+        CrystalSword,
+        BroadSword,
+        LongSword,
+        WarSword,
+        TwoHandedSword,
+        Claymore,
+        GiantSword,
+        BastardSword,
+        Flamberge,
+        GreatSword,
+        Dagger,
+        Dirk,
+        Kris,
+        Blade,
+        ThrowingKnife,
+        ThrowingAxe,
+        BalancedKnife,
+        BalancedAxe,
+        Javelin,
+        Pilum,
+        ShortSpear,
+        Glaive,
+        ThrowingSpear,
+        Spear,
+        Trident,
+        Brandistock,
+        Spetum,
+        Pike,
+        Bardiche,
+        Voulge,
+        Scythe,
+        Poleaxe,
+        Halberd,
+        WarScythe,
+        ShortStaff,
+        LongStaff,
+        GnarledStaff,
+        BattleStaff,
+        WarStaff,
+        ShortBow,
+        HuntersBow,
+        LongBow,
+        CompositeBow,
+        ShortBattleBow,
+        LongBattleBow,
+        ShortWarBow,
+        LongWarBow,
+        LightCrossbow,
+        Crossbow,
+        HeavyCrossbow,
+        RepeatingCrossbow,
+        RancidGasPotion,
+        OilPotion,
+        ChokingGasPotion,
+        ExplodingPotion,
+        StranglingGasPotion,
+        FulminatingPotion,
+        DecoyGidbinn,
+        TheGidbinn,
+        WirtsLeg,
+        HoradricMalus,
+        HellforgeHammer,
+        HoradricStaff,
+        StaffOfKings,
+        Hatchet,
+        Cleaver,
+        TwinAxe,
+        Crowbill,
+        Naga,
+        MilitaryAxe,
+        BeardedAxe,
+        Tabar,
+        GothicAxe,
+        AncientAxe,
+        BurntWand,
+        PetrifiedWand,
+        TombWand,
+        GraveWand,
+        Cudgel,
+        RuneScepter,
+        HolyWaterSprinkler,
+        DivineScepter,
+        BarbedClub,
+        FlangedMace,
+        JaggedStar,
+        Knout,
+        BattleHammer,
+        WarClub,
+        MartelDeFer,
+        Gladius,
+        Cutlass,
+        Shamshir,
+        Tulwar,
+        DimensionalBlade,
+        BattleSword,
+        RuneSword,
+        AncientSword,
+        Espandon,
+        DacianFalx,
+        TuskSword,
+        GothicSword,
+        Zweihander,
+        ExecutionerSword,
+        Poignard,
+        Rondel,
+        Cinquedeas,
+        Stiletto,
+        BattleDart,
+        Francisca,
+        WarDart,
+        Hurlbat,
+        WarJavelin,
+        GreatPilum,
+        Simbilan,
+        Spiculum,
+        Harpoon,
+        WarSpear,
+        Fuscina,
+        WarFork,
+        Yari,
+        Lance,
+        LochaberAxe,
+        Bill,
+        BattleScythe,
+        Partizan,
+        BecDeCorbin,
+        GrimScythe,
+        JoStaff,
+        QuarterStaff,
+        CedarStaff,
+        GothicStaff,
+        RuneStaff,
+        EdgeBow,
+        RazorBow,
+        CedarBow,
+        DoubleBow,
+        ShortSiegeBow,
+        LargeSiegeBow,
+        RuneBow,
+        GothicBow,
+        Arbalest,
+        SiegeCrossbow,
+        Ballista,
+        ChuKoNu,
+        KhalimsFlail,
+        KhalimsWill,
+        Katar,
+        WristBlade,
+        HatchetHands,
+        Cestus,
+        Claws,
+        BladeTalons,
+        ScissorsKatar,
+        Quhab,
+        WristSpike,
+        Fascia,
+        HandScythe,
+        GreaterClaws,
+        GreaterTalons,
+        ScissorsQuhab,
+        Suwayyah,
+        WristSword,
+        WarFist,
+        BattleCestus,
+        FeralClaws,
+        RunicTalons,
+        ScissorsSuwayyah,
+        Tomahawk,
+        SmallCrescent,
+        EttinAxe,
+        WarSpike,
+        BerserkerAxe,
+        FeralAxe,
+        SilverEdgedAxe,
+        Decapitator,
+        ChampionAxe,
+        GloriousAxe,
+        PolishedWand,
+        GhostWand,
+        LichWand,
+        UnearthedWand,
+        Truncheon,
+        MightyScepter,
+        SeraphRod,
+        Caduceus,
+        TyrantClub,
+        ReinforcedMace,
+        DevilStar,
+        Scourge,
+        LegendaryMallet,
+        OgreMaul,
+        ThunderMaul,
+        Falcata,
+        Ataghan,
+        ElegantBlade,
+        HydraEdge,
+        PhaseBlade,
+        ConquestSword,
+        CrypticSword,
+        MythicalSword,
+        LegendSword,
+        HighlandBlade,
+        BalrogBlade,
+        ChampionSword,
+        ColossusSword,
+        ColossusBlade,
+        BoneKnife,
+        MithrilPoint,
+        FangedKnife,
+        LegendSpike,
+        FlyingKnife,
+        FlyingAxe,
+        WingedKnife,
+        WingedAxe,
+        HyperionJavelin,
+        StygianPilum,
+        BalrogSpear,
+        GhostGlaive,
+        WingedHarpoon,
+        HyperionSpear,
+        StygianPike,
+        Mancatcher,
+        GhostSpear,
+        WarPike,
+        OgreAxe,
+        ColossusVoulge,
+        Thresher,
+        CrypticAxe,
+        GreatPoleaxe,
+        GiantThresher,
+        WalkingStick,
+        Stalagmite,
+        ElderStaff,
+        Shillelagh,
+        ArchonStaff,
+        SpiderBow,
+        BladeBow,
+        ShadowBow,
+        GreatBow,
+        DiamondBow,
+        CrusaderBow,
+        WardBow,
+        HydraBow,
+        PelletBow,
+        GorgonCrossbow,
+        ColossusCrossbow,
+        DemonCrossBow,
+        EagleOrb,
+        SacredGlobe,
+        SmokedSphere,
+        ClaspedOrb,
+        JaredsStone,
+        StagBow,
+        ReflexBow,
+        MaidenSpear,
+        MaidenPike,
+        MaidenJavelin,
+        GlowingOrb,
+        CrystallineGlobe,
+        CloudySphere,
+        SparklingBall,
+        SwirlingCrystal,
+        AshwoodBow,
+        CeremonialBow,
+        CeremonialSpear,
+        CeremonialPike,
+        CeremonialJavelin,
+        HeavenlyStone,
+        EldritchOrb,
+        DemonHeart,
+        VortexOrb,
+        DimensionalShard,
+        MatriarchalBow,
+        GrandMatronBow,
+        MatriarchalSpear,
+        MatriarchalPike,
+        MatriarchalJavelin,
+        Cap,
+        SkullCap,
+        Helm,
+        FullHelm,
+        GreatHelm,
+        Crown,
+        Mask,
+        QuiltedArmor,
+        LeatherArmor,
+        HardLeatherArmor,
+        StuddedLeather,
+        RingMail,
+        ScaleMail,
+        ChainMail,
+        BreastPlate,
+        SplintMail,
+        PlateMail,
+        FieldPlate,
+        GothicPlate,
+        FullPlateMail,
+        AncientArmor,
+        LightPlate,
+        Buckler,
+        SmallShield,
+        LargeShield,
+        KiteShield,
+        TowerShield,
+        GothicShield,
+        LeatherGloves,
+        HeavyGloves,
+        ChainGloves,
+        LightGauntlets,
+        Gauntlets,
+        Boots,
+        HeavyBoots,
+        ChainBoots,
+        LightPlatedBoots,
+        Greaves,
+        Sash,
+        LightBelt,
+        Belt,
+        HeavyBelt,
+        PlatedBelt,
+        BoneHelm,
+        BoneShield,
+        SpikedShield,
+        WarHat,
+        Sallet,
+        Casque,
+        Basinet,
+        WingedHelm,
+        GrandCrown,
+        DeathMask,
+        GhostArmor,
+        SerpentskinArmor,
+        DemonhideArmor,
+        TrellisedArmor,
+        LinkedMail,
+        TigulatedMail,
+        MeshArmor,
+        Cuirass,
+        RussetArmor,
+        TemplarCoat,
+        SharktoothArmor,
+        EmbossedPlate,
+        ChaosArmor,
+        OrnatePlate,
+        MagePlate,
+        Defender,
+        RoundShield,
+        Scutum,
+        DragonShield,
+        Pavise,
+        AncientShield,
+        DemonhideGloves,
+        SharkskinGloves,
+        HeavyBracers,
+        BattleGauntlets,
+        WarGauntlets,
+        DemonhideBoots,
+        SharkskinBoots,
+        MeshBoots,
+        BattleBoots,
+        WarBoots,
+        DemonhideSash,
+        SharkskinBelt,
+        MeshBelt,
+        BattleBelt,
+        WarBelt,
+        GrimHelm,
+        GrimShield,
+        BarbedShield,
+        WolfHead,
+        HawkHelm,
+        Antlers,
+        FalconMask,
+        SpiritMask,
+        JawboneCap,
+        FangedHelm,
+        HornedHelm,
+        AssaultHelmet,
+        AvengerGuard,
+        Targe,
+        Rondache,
+        HeraldicShield,
+        AerinShield,
+        CrownShield,
+        PreservedHead,
+        ZombieHead,
+        UnravellerHead,
+        GargoyleHead,
+        DemonHeadShield,
+        Circlet,
+        Coronet,
+        Tiara,
+        Diadem,
+        Shako,
+        Hydraskull,
+        Armet,
+        GiantConch,
+        SpiredHelm,
+        Corona,
+        DemonHead,
+        DuskShroud,
+        Wyrmhide,
+        ScarabHusk,
+        WireFleece,
+        DiamondMail,
+        LoricatedMail,
+        Boneweave,
+        GreatHauberk,
+        BalrogSkin,
+        HellforgePlate,
+        KrakenShell,
+        LacqueredPlate,
+        ShadowPlate,
+        SacredArmor,
+        ArchonPlate,
+        Heater,
+        Luna,
+        Hyperion,
+        Monarch,
+        Aegis,
+        Ward,
+        BrambleMitts,
+        VampireboneGloves,
+        Vambraces,
+        CrusaderGauntlets,
+        OgreGauntlets,
+        WyrmhideBoots,
+        ScarabshellBoots,
+        BoneweaveBoots,
+        MirroredBoots,
+        MyrmidonGreaves,
+        SpiderwebSash,
+        VampirefangBelt,
+        MithrilCoil,
+        TrollBelt,
+        ColossusGirdle,
+        BoneVisage,
+        TrollNest,
+        BladeBarrier,
+        AlphaHelm,
+        GriffonHeaddress,
+        HuntersGuise,
+        SacredFeathers,
+        TotemicMask,
+        JawboneVisor,
+        LionHelm,
+        RageMask,
+        SavageHelmet,
+        SlayerGuard,
+        AkaranTarge,
+        AkaranRondache,
+        ProtectorShield,
+        GildedShield,
+        RoyalShield,
+        MummifiedTrophy,
+        FetishTrophy,
+        SextonTrophy,
+        CantorTrophy,
+        HierophantTrophy,
+        BloodSpirit,
+        SunSpirit,
+        EarthSpirit,
+        SkySpirit,
+        DreamSpirit,
+        CarnageHelm,
+        FuryVisor,
+        DestroyerHelm,
+        ConquerorCrown,
+        GuardianCrown,
+        SacredTarge,
+        SacredRondache,
+        KurastShield,
+        ZakarumShield,
+        VortexShield,
+        MinionSkull,
+        HellspawnSkull,
+        OverseerSkull,
+        SuccubusSkull,
+        BloodlordSkull,
+        Elixir,
+        INVALID509,
+        INVALID510,
+        INVALID511,
+        INVALID512,
+        StaminaPotion,
+        AntidotePotion,
+        RejuvenationPotion,
+        FullRejuvenationPotion,
+        ThawingPotion,
+        TomeOfTownPortal,
+        TomeOfIdentify,
+        Amulet,
+        AmuletOfTheViper,
+        Ring,
+        Gold,
+        ScrollOfInifuss,
+        KeyToTheCairnStones,
+        Arrows,
+        Torch,
+        Bolts,
+        ScrollOfTownPortal,
+        ScrollOfIdentify,
+        Heart,
+        Brain,
+        Jawbone,
+        Eye,
+        Horn,
+        Tail,
+        Flag,
+        Fang,
+        Quill,
+        Soul,
+        Scalp,
+        Spleen,
+        Key,
+        TheBlackTowerKey,
+        PotionOfLife,
+        AJadeFigurine,
+        TheGoldenBird,
+        LamEsensTome,
+        HoradricCube,
+        HoradricScroll,
+        MephistosSoulstone,
+        BookOfSkill,
+        KhalimsEye,
+        KhalimsHeart,
+        KhalimsBrain,
+        Ear,
+        ChippedAmethyst,
+        FlawedAmethyst,
+        Amethyst,
+        FlawlessAmethyst,
+        PerfectAmethyst,
+        ChippedTopaz,
+        FlawedTopaz,
+        Topaz,
+        FlawlessTopaz,
+        PerfectTopaz,
+        ChippedSapphire,
+        FlawedSapphire,
+        Sapphire,
+        FlawlessSapphire,
+        PerfectSapphire,
+        ChippedEmerald,
+        FlawedEmerald,
+        Emerald,
+        FlawlessEmerald,
+        PerfectEmerald,
+        ChippedRuby,
+        FlawedRuby,
+        Ruby,
+        FlawlessRuby,
+        PerfectRuby,
+        ChippedDiamond,
+        FlawedDiamond,
+        Diamond,
+        FlawlessDiamond,
+        PerfectDiamond,
+        MinorHealingPotion,
+        LightHealingPotion,
+        HealingPotion,
+        GreaterHealingPotion,
+        SuperHealingPotion,
+        MinorManaPotion,
+        LightManaPotion,
+        ManaPotion,
+        GreaterManaPotion,
+        SuperManaPotion,
+        ChippedSkull,
+        FlawedSkull,
+        Skull,
+        FlawlessSkull,
+        PerfectSkull,
+        Herb,
+        SmallCharm,
+        LargeCharm,
+        GrandCharm,
+        INVALID606,
+        INVALID607,
+        INVALID608,
+        INVALID609,
+        ElRune,
+        EldRune,
+        TirRune,
+        NefRune,
+        EthRune,
+        IthRune,
+        TalRune,
+        RalRune,
+        OrtRune,
+        ThulRune,
+        AmnRune,
+        SolRune,
+        ShaelRune,
+        DolRune,
+        HelRune,
+        IoRune,
+        LumRune,
+        KoRune,
+        FalRune,
+        LemRune,
+        PulRune,
+        UmRune,
+        MalRune,
+        IstRune,
+        GulRune,
+        VexRune,
+        OhmRune,
+        LoRune,
+        SurRune,
+        BerRune,
+        JahRune,
+        ChamRune,
+        ZodRune,
+        Jewel,
+        MalahsPotion,
+        ScrollOfKnowledge,
+        ScrollOfResistance,
+        KeyOfTerror,
+        KeyOfHate,
+        KeyOfDestruction,
+        DiablosHorn,
+        BaalsEye,
+        MephistosBrain,
+        TokenofAbsolution,
+        TwistedEssenceOfSuffering,
+        ChargedEssenceOfHatred,
+        BurningEssenceOfTerror,
+        FesteringEssenceOfDestruction,
+        StandardOfHeroes,
+
+        // Used only for item filter
+        ClassAxes = 0xFFD0,
+
+        ClassWands,
+        ClassClubs,
+        ClassScepters,
+        ClassMaces,
+        ClassHammers,
+        ClassSwords,
+        ClassDaggers,
+        ClassThrowingKnifes,
+        ClassThrowingAxes,
+        ClassJavelins,
+        ClassSpears,
+        ClassPolearms,
+        ClassStaves,
+        ClassBows,
+        ClassCrossbows,
+
+        ClassHelms,
+        ClassArmors,
+        ClassShields,
+        ClassGloves,
+        ClassBoots,
+        ClassBelts,
+        ClassCirclets,
+
+        ClassAssassinKatars,
+        ClassSorceressOrbs,
+        ClassAmazonBows,
+        ClassAmazonSpears,
+        ClassAmazonJavelins,
+        ClassDruidHelms,
+        ClassBarbarianHelms,
+        ClassPaladinShields,
+        ClassNecromancerShields,
+
+        xBases = 0xFFFF - 0x1,
+        Any = 0xFFFF
+    };
+
+    public enum ItemTier
+    {
+        Normal,
+        Exceptional,
+        Elite,
+        NotApplicable
+    }
+
+    public enum StashTab
+    {
+        None,
+        Personal,
+        Shared1,
+        Shared2,
+        Shared3
     }
 }

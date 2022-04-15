@@ -17,7 +17,9 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  **/
 
+using MapAssist.Helpers;
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace MapAssist.Structs
@@ -45,31 +47,4 @@ namespace MapAssist.Structs
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 0x40)]
         public string ObjectType;
     }
-
-    public enum ShrineType : byte
-    {
-        None,
-        Refill,
-        Health,
-        Mana,
-        HPXChange,
-        ManaXChange,
-        Armor,
-        Combat,
-        ResistFire,
-        ResistCold,
-        ResistLight,
-        ResistPoison,
-        Skill,
-        ManaRegen,
-        Stamina,
-        Experience,
-        Shrine,
-        Portal,
-        Gem,
-        Fire,
-        Monster,
-        Explosive,
-        Poison
-    };
 }

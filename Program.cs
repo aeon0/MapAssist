@@ -1,6 +1,6 @@
 /**
  *   Copyright (C) 2021 okaygo
- *   
+ *
  *   https://github.com/misterokaygo/MapAssist/
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -17,40 +17,41 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  **/
 
-using System;
-using System.Threading;
-using System.Windows.Forms;
 using Gma.System.MouseKeyHook;
+using MapAssist.Helpers;
 using MapAssist.Settings;
+using NLog;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
-using NLog;
-using MapAssist.Helpers;
-using MapAssist.Types;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Windows.Forms;
 
 namespace MapAssist
 {
-    static class Program
+    internal static class Program
     {
         private static readonly string githubSha = "GITHUB_SHA";
         private static readonly string githubRunNumber = "GITHUB_RUN_NUMBER";
         private static readonly string appName = "MapAssist";
         private static string messageBoxTitle = $"{appName} v1.0.0";
-        private static Mutex mutex = null; 
-        
+        private static Mutex mutex = null;
+
+        private static ConfigEditor configEditor;
         private static NotifyIcon trayIcon;
         //private static Overlay overlay;
         //private static BackgroundWorker backWorkOverlay = new BackgroundWorker();
         private static Api api;
         private static BackgroundWorker backWorkerApi = new BackgroundWorker();
         private static IKeyboardMouseEvents globalHook = Hook.GlobalEvents();
-        private static readonly Logger _log = LogManager.GetCurrentClassLogger(); 
+        private static readonly Logger _log = LogManager.GetCurrentClassLogger();
 
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main()
+        private static void Main()
         {
             try
             {
@@ -77,6 +78,11 @@ namespace MapAssist
                     if (githubSha.Length == 40)
                     {
                         _log.Info($"Running from commit {githubSha}");
+                    }
+
+                    if (MapAssistConfiguration.Loaded.DPIAware)
+                    {
+                        SetProcessDPIAware();
                     }
 
                     Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
@@ -106,7 +112,7 @@ namespace MapAssist
 
                     var contextMenu = new ContextMenuStrip();
 
-                    var configMenuItem = new ToolStripMenuItem("Config", null, Config);
+                    var configMenuItem = new ToolStripMenuItem("Config", null, ShowConfigEditor);
                     var lootFilterMenuItem = new ToolStripMenuItem("Loot Filter", null, LootFilter);
                     var restartMenuItem = new ToolStripMenuItem("Restart", null, TrayRestart);
                     var exitMenuItem = new ToolStripMenuItem("Exit", null, TrayExit);
@@ -127,18 +133,6 @@ namespace MapAssist
                         Text = appName,
                         Visible = true
                     };
-
-                    //globalHook.KeyPress += (sender, args) =>
-                    //{
-                    //    if (overlay != null)
-                    //    {
-                    //        overlay.KeyPressHandler(sender, args);
-                    //    }
-                    //};
-                    
-                    //backWorkOverlay.DoWork += new DoWorkEventHandler(RunOverlay);
-                    //backWorkOverlay.WorkerSupportsCancellation = true;
-                    //backWorkOverlay.RunWorkerAsync();
 
                     backWorkerApi.DoWork += new DoWorkEventHandler(RunApi);
                     backWorkerApi.WorkerSupportsCancellation = true;
@@ -192,7 +186,7 @@ namespace MapAssist
 
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            ProcessException((Exception) e.ExceptionObject);
+            ProcessException((Exception)e.ExceptionObject);
         }
 
         private static void Application_ThreadException(object sender, ThreadExceptionEventArgs e)
@@ -214,8 +208,8 @@ namespace MapAssist
                 _log.Fatal(e);
                 _log.Fatal(e, "Invalid yaml for configuration file");
 
-                MessageBox.Show(e.Message, $"{messageBoxTitle}: MapAssist configuration yaml parsing error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                var message = e.InnerException != null ? e.InnerException.Message : e.Message;
+                MessageBox.Show(message, $"{messageBoxTitle}: MapAssist configuration yaml parsing error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch (Exception e)
             {
@@ -232,16 +226,15 @@ namespace MapAssist
             try
             {
                 LootLogConfiguration.Load();
-                Items.LoadLocalization();
                 configurationOk = true;
             }
             catch (YamlDotNet.Core.YamlException e)
             {
                 _log.Fatal(e);
-                _log.Fatal("Invalid loot log yaml file");
+                _log.Fatal("Invalid item log yaml file");
 
-                MessageBox.Show(e.Message, $"{messageBoxTitle}: Loop filter yaml parsing error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                var message = e.InnerException != null ? e.InnerException.Message : e.Message;
+                MessageBox.Show(message, $"{messageBoxTitle}: Item filter yaml parsing error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch (Exception e)
             {
@@ -263,6 +256,7 @@ namespace MapAssist
                 var logfile = new NLog.Targets.FileTarget("logfile")
                 {
                     FileName = "logs\\log.txt",
+                    CreateDirs = true,
                     ArchiveNumbering = NLog.Targets.ArchiveNumberingMode.DateAndSequence,
                     ArchiveOldFileOnStartup = true,
                     MaxArchiveFiles = 5
@@ -286,10 +280,21 @@ namespace MapAssist
             return configurationOk;
         }
 
-        private static void Config(object sender, EventArgs e)
+        private static void ShowConfigEditor(object sender, EventArgs e)
         {
-            var _path = AppDomain.CurrentDomain.BaseDirectory;
-            Process.Start(_path + "\\Config.yaml");
+            if (configEditor == null)
+            {
+                configEditor = new ConfigEditor();
+            }
+
+            if (configEditor.Visible)
+            {
+                configEditor.Activate();
+            }
+            else
+            {
+                configEditor.ShowDialog();
+            }
         }
 
         private static void LootFilter(object sender, EventArgs e)
@@ -302,10 +307,10 @@ namespace MapAssist
         {
             _log.Info("Disposing");
 
+            // overlay.Dispose();
             GameManager.Dispose();
             MapApi.Dispose();
             globalHook.Dispose();
-            // overlay.Dispose();
             trayIcon.Dispose();
             api.Dispose();
 
@@ -339,5 +344,8 @@ namespace MapAssist
 
             Application.Exit();
         }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetProcessDPIAware();
     }
 }

@@ -32,6 +32,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using Path = System.IO.Path;
 
 #pragma warning disable 649
@@ -48,6 +49,9 @@ namespace MapAssist.Helpers
         private readonly ConcurrentDictionary<Area, AreaData> _cache;
         private Difficulty _difficulty;
         private uint _mapSeed;
+
+        private static int trailingSlash = -1; // -1 = Still trying to figure out, 0 = remove trailing slash, 1 = required trailing slash
+        private static int trailingSlashTry = 0; // Which trailing slash preference to try
 
         private static readonly Dictionary<string, uint> GameCRC32 = new Dictionary<string, uint> {
             {"1.11a", 0xf44cd0cf },
@@ -77,7 +81,17 @@ namespace MapAssist.Helpers
                 throw new Exception("Unable to start map server. Check Anti Virus settings.");
             }
 
-            var path = FindD2();
+            var path = FindD2LoD();
+
+            if (trailingSlash == 0 || trailingSlashTry == 0) // Remove trailing slash
+            {
+                path = path.TrimEnd('\\');
+            }
+            else if (trailingSlash == 1 || trailingSlashTry == 1) // Require trailing slash
+            {
+                path = path.TrimEnd('\\') + "\\";
+            }
+
             _pipeClient = new Process();
             _pipeClient.StartInfo.FileName = procFile;
             _pipeClient.StartInfo.Arguments = "\"" + path + "\"";
@@ -93,38 +107,50 @@ namespace MapAssist.Helpers
             return startupLength == 0;
         }
 
-        private static string FindD2()
+        private static string FindD2LoD()
         {
-            var providedPath = MapAssistConfiguration.Loaded.D2Path;
+            var providedPath = MapAssistConfiguration.Loaded.D2LoDPath;
             if (!string.IsNullOrEmpty(providedPath))
             {
-                if (Path.HasExtension(providedPath))
+                //Set attributes of directory used
+                var attributes = File.GetAttributes($@"{providedPath}");
+                //If this flag is found, path is a directory. Otherwise it is a file
+                if (!attributes.HasFlag(FileAttributes.Directory))
                 {
-                    throw new Exception("Provided D2 path is not set to a directory");
+                    var config1 = new ConfigEditor();
+                    MessageBox.Show("Provided D2 LoD path is not set to a directory." + Environment.NewLine + Environment.NewLine + "Please provide a path to a D2 LoD 1.13c installation and restart MapAssist.");
+                    config1.ShowDialog();
+                    return null;
                 }
 
-                if (IsValidD2Path(providedPath))
+                if (IsValidD2LoDPath(providedPath))
                 {
-                    _log.Info("User provided D2 path is valid");
+                    _log.Info("User provided D2 LoD path is valid");
                     return providedPath;
                 }
 
-                _log.Info("User provided D2 path is invalid");
-                throw new Exception("Provided D2 path is not the correct version");
+                var config = new ConfigEditor();
+                _log.Info("User provided D2 LoD path is invalid");
+                MessageBox.Show("Provided D2 LoD path is not the correct version." + Environment.NewLine + Environment.NewLine + "Please provide a path to a D2 LoD 1.13c installation and restart MapAssist.");
+                config.ShowDialog();
+                return null;
             }
 
             var installPath = Registry.GetValue("HKEY_CURRENT_USER\\SOFTWARE\\Blizzard Entertainment\\Diablo II", "InstallPath", "INVALID") as string;
-            if (installPath == "INVALID" || !IsValidD2Path(installPath))
+            if (installPath == "INVALID" || !IsValidD2LoDPath(installPath))
             {
-                _log.Info("Registry-provided D2 path not found or invalid");
-                throw new Exception("Unable to automatically locate D2 installation. Please provide path manually in the config at `D2Path`.");
+                _log.Info("Registry-provided D2 LoD path not found or invalid");
+                MessageBox.Show("Unable to automatically locate D2 LoD installation." + Environment.NewLine + Environment.NewLine + "Please provide a path to a D2 LoD 1.13c installation and restart MapAssist.");
+                var config = new ConfigEditor();
+                config.ShowDialog();
+                return null;
             }
 
-            _log.Info("Registry-provided D2 path is valid");
+            _log.Info("Registry-provided D2 LoD path is valid");
             return installPath;
         }
 
-        private static bool IsValidD2Path(string path)
+        private static bool IsValidD2LoDPath(string path)
         {
             try
             {
@@ -137,7 +163,7 @@ namespace MapAssist.Helpers
                         var allowedChecksum = kvp.Value;
                         if (fileChecksum == allowedChecksum)
                         {
-                            _log.Info("Valid D2 version identified by Game.exe - v" + kvp.Key);
+                            _log.Info("Valid D2 LoD version identified by Game.exe - v" + kvp.Key);
                             return true;
                         }
                     }
@@ -152,7 +178,7 @@ namespace MapAssist.Helpers
                             var allowedChecksum = kvp.Value;
                             if (fileChecksum == allowedChecksum)
                             {
-                                _log.Info("Valid D2 version identified by Storm.dll - v" + kvp.Key);
+                                _log.Info("Valid D2 LoD version identified by Storm.dll - v" + kvp.Key);
                                 return true;
                             }
                         }
@@ -168,6 +194,11 @@ namespace MapAssist.Helpers
 
         private static async Task<(uint, string)> MapApiRequest(byte[] writeBytes = null, int timeout = 1000)
         {
+            if (_pipeClient.HasExited)
+            {
+                _log.Warn($"{_procName} has exited unexpectedly");
+            }
+
             if (disposed || _pipeClient.HasExited)
             {
                 return (0, null);
@@ -205,6 +236,7 @@ namespace MapAssist.Helpers
                 }
                 else
                 {
+                    _log.Warn($"Request timed out after {timeout} ms");
                     return null;
                 }
             };
@@ -222,6 +254,15 @@ namespace MapAssist.Helpers
             if (length == 0)
             {
                 return (0, null);
+            }
+
+            if (length == uint.MaxValue) // Try a different trailing slash logic
+            {
+                trailingSlashTry++;
+            }
+            else if (length > 0) // Trailing slash attempt worked and keep that logic for future requests
+            {
+                trailingSlash = trailingSlashTry;
             }
 
             string json = null;
@@ -285,8 +326,8 @@ namespace MapAssist.Helpers
             {
                 Area[] adjacentAreas = areaData.AdjacentLevels.Keys.ToArray();
 
-                if (areaData.Area == Area.OuterCloister) adjacentAreas = adjacentAreas.Append(Area.Barracks).ToArray(); // Missing adjacent area
-                if (areaData.Area == Area.Barracks) adjacentAreas = adjacentAreas.Append(Area.OuterCloister).ToArray(); // Missing adjacent area
+                var additionalAreas = GetAdjacentLevelsForWideArea(areaData.Area);
+                adjacentAreas = adjacentAreas.Concat(additionalAreas).ToArray();
 
                 if (adjacentAreas.Length > 0)
                 {
@@ -318,6 +359,89 @@ namespace MapAssist.Helpers
             }
 
             return areaData;
+        }
+
+        private Area[] GetAdjacentLevelsForWideArea(Area area)
+        {
+            // Improve stitching by rendering more areas than directly adjacent levels
+            // Sometimes render areas 2 maps away to get a better picture
+            switch (area)
+            {
+                case Area.BlackMarsh:
+                    return new Area[] {
+                        Area.MonasteryGate,
+                        Area.OuterCloister,
+                    };
+                case Area.TamoeHighland:
+                    return new Area[] {
+                        Area.OuterCloister,
+                        Area.Barracks,
+                    };
+                case Area.MonasteryGate:
+                    return new Area[] {
+                        Area.BlackMarsh,
+                        Area.Barracks,
+                    };
+                case Area.OuterCloister:
+                    return new Area[] {
+                        Area.BlackMarsh,
+                        Area.TamoeHighland,
+                        Area.Barracks, // Missing adjacent area
+                    };
+                case Area.Barracks:
+                    return new Area[] {
+                        Area.TamoeHighland,
+                        Area.MonasteryGate,
+                        Area.OuterCloister, // Missing adjacent area
+                    };
+                case Area.InnerCloister:
+                    return new Area[] {
+                        Area.Cathedral, // Missing adjacent area
+                    };
+                case Area.Cathedral:
+                    return new Area[] {
+                        Area.InnerCloister, // Missing adjacent area
+                    };
+                case Area.LutGholein:
+                    return new Area[] {
+                        Area.DryHills,
+                    };
+                case Area.DryHills:
+                    return new Area[] {
+                        Area.LutGholein,
+                        Area.LostCity,
+                    };
+                case Area.RockyWaste:
+                    return new Area[] {
+                        Area.FarOasis,
+                    };
+                case Area.LostCity:
+                    return new Area[] {
+                        Area.DryHills,
+                    };
+                case Area.FarOasis:
+                    return new Area[] {
+                        Area.RockyWaste,
+                    };
+                case Area.GreatMarsh:
+                    return new Area[] {
+                        Area.FlayerJungle,
+                    };
+                case Area.FlayerJungle:
+                    return new Area[] {
+                        Area.GreatMarsh,
+                    };
+                case Area.UpperKurast:
+                    return new Area[] {
+                        Area.Travincal,
+                    };
+                case Area.Travincal:
+                    return new Area[] {
+                        Area.UpperKurast,
+                    };
+                default:
+                    return new Area[] { };
+            }
         }
 
         private AreaData GetMapDataInternal(Area area)

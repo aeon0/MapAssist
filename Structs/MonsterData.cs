@@ -28,6 +28,7 @@ namespace MapAssist.Structs
         [FieldOffset(0x0)] public IntPtr pMonStats;
         [FieldOffset(0x8)] public ulong ShrineType;
         [FieldOffset(0x1A)] public MonsterTypeFlags MonsterType;
+        [FieldOffset(0x2A)] public ushort BossLineID;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]

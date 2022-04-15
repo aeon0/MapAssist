@@ -47,8 +47,7 @@ namespace MapAssist.Files.Font
         public GameOverlay.Drawing.Font CreateFont(float size)
         {
             return new GameOverlay.Drawing.Font(new TextFormat(_factoryDWrite, FontFamilyName, _fontCollection,
-                FontWeight.Medium,
-                FontStyle.Normal, FontStretch.Normal, size));
+                FontWeight.Normal, FontStyle.Normal, FontStretch.Normal, size));
         }
     }
 }

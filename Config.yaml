@@ -1,66 +1,71 @@
-# IMPORTANT: After changing anything in this file, ensure validity using https://jsonformatter.org/yaml-validator
-
-## HotkeyConfiguration - Keyboard shortcuts for the overlay
+# Change these settings from the Config GUI provided in MapAssist
 HotkeyConfiguration:
-  ToggleKey: '\'
-  ZoomInKey: '+'
-  ZoomOutKey: '-'
-
-## HiddenAreas - Areas where the overlay is not needed and will be hidden
+  ToggleKey: '|'
+  HideMapKey: ''
+  AreaLevelKey: '['
+  ZoomInKey: Num +
+  ZoomOutKey: Num -
+  ExportItemsKey: F9
 HiddenAreas:
-  - 'Rogue Encampment'
-  - 'Lut Gholein'
-  - 'Kurast Docks'
-  - 'Pandemonium Fortress'
-  - 'Harrogath'
-  - 'Forgotten Tower'
-  - "Nihlathak's Temple"
-
-## RenderingConfiguration - Visual settings for the overlay
+- Forgotten Tower
 RenderingConfiguration:
-  ## Opacity - Map transparency %
   Opacity: 1.0
-  ## Opacity - Icon transparency %
-  IconOpacity: 0.9
-  ## OverlayMode - Overlay map over in-game map / can be hidden with hotkey (ToggleKey)
+  IconOpacity: 1.0
   OverlayMode: false
-  ## Positions - Options are: Center, TopLeft, TopRight
   Position: Center
-  ## ToggleViaInGameMap - Auto-hide map overlay when the in-game map is hidden
+  MonsterHealthBar: false
   ToggleViaInGameMap: true
-  ## ToggleViaInGamePanels - Auto-hide overlay when in-game panels/menus are opened
   ToggleViaInGamePanels: true
-  ## Size - Overlay map maximum size
+  StickToLastGameWindow: false
   Size: 800
-  ## ZoomLevel - Zoom level / can zoom in/out with hotkeys (ZoomInKey, ZoomOutKey)
   ZoomLevel: 1
-  ## BuffPosition - Options are: Player, Top, Bottom
-  BuffPosition: Bottom
-  ## BuffSize - Size of the buff icons (0.8 = 80%, 1 = 100%, 1.2 = 120%)
   BuffSize: 1
-
-## MapConfiguration -- Visual settings for icons, lines and labels
+  BuffPosition: Bottom
+  BuffAlertLowRes: true
+  ShowLife: false
+  ShowLifePerc: true
+  ShowMana: false
+  ShowManaPerc: true
+  ShowCurrentLevel: false
+  ShowExpProgress: true
+  ShowPotionBelt: true
+  ShowResistances: false
+  LinesMode: All
 MapConfiguration:
   SuperUniqueMonster:
-    IconColor: Yellow
+    IconOutlineColor: Yellow
     IconShape: Cross
     IconSize: 6
     IconThickness: 2
   UniqueMonster:
-    IconColor: DarkOrange
+    IconOutlineColor: DarkOrange
     IconShape: Cross
     IconSize: 6
     IconThickness: 2
-  EliteMonster:
-    IconColor: DarkRed
+  ChampionMonster:
+    IconOutlineColor: DarkRed
     IconShape: Cross
     IconSize: 6
     IconThickness: 2
+  MinionMonster:
+    IconOutlineColor: 255, 150, 150
+    IconShape: Cross
+    IconSize: 6
+    IconThickness: 1
   NormalMonster:
-    IconColor: Gray
+    IconOutlineColor: Gray
     IconShape: Cross
     IconSize: 6
-    IconThickness: 2
+    IconThickness: 1
+  Npc:
+    IconOutlineColor: 196, 196, 196
+    IconShape: Cross
+    IconSize: 6
+    IconThickness: 1
+    LabelColor: 199, 179, 119
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
   NextArea:
     IconColor: SpringGreen
     IconShape: Square
@@ -69,16 +74,17 @@ MapConfiguration:
     LineThickness: 2
     ArrowHeadSize: 15
     LabelColor: SpringGreen
-    LabelFontSize: 16
-    LabelFont: 'Exocet Blizzard Mixed Caps'
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
   PreviousArea:
     IconColor: Violet
     IconShape: Square
     IconSize: 5
-    LineColor: ''
     LabelColor: Violet
-    LabelFontSize: 16
-    LabelFont: 'Exocet Blizzard Mixed Caps'
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
   Waypoint:
     IconColor: SteelBlue
     IconShape: Square
@@ -88,120 +94,189 @@ MapConfiguration:
     LineThickness: 2
     ArrowHeadSize: 15
     LabelColor: Tomato
-    LabelFontSize: 16
-    LabelFont: 'Exocet Blizzard Mixed Caps'
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
   Player:
-    IconColor: Chartreuse
+    IconOutlineColor: 33, 136, 253
     IconShape: Cross
     IconSize: 6
     IconThickness: 2
     LabelColor: Chartreuse
-    LabelFontSize: 16
-    LabelFont: 'Exocet Blizzard Mixed Caps'
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
+  PartyPlayer:
+    IconOutlineColor: Chartreuse
+    IconShape: Cross
+    IconSize: 6
+    IconThickness: 2
+    LabelColor: Chartreuse
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
   NonPartyPlayer:
-    IconColor: Orange
+    IconOutlineColor: Orange
     IconShape: Cross
     IconSize: 6
     IconThickness: 2
     LabelColor: Orange
-    LabelFontSize: 16
-    LabelFont: 'Exocet Blizzard Mixed Caps'
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
   HostilePlayer:
-    IconColor: Red
+    IconOutlineColor: Red
     IconShape: Cross
     IconSize: 6
     IconThickness: 2
-    LabelColor: Red
-    LabelFontSize: 16
-    LabelFont: 'Exocet Blizzard Mixed Caps'
     LineColor: Red
     LineThickness: 2
     ArrowHeadSize: 15
+    LabelColor: Red
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
+  MyMerc:
+    IconOutlineColor: 77, 120, 124
+    IconShape: Cross
+    IconSize: 6
+    IconThickness: 1
+  OtherMercs:
+    IconOutlineColor: 81, 167, 60
+    IconShape: Cross
+    IconSize: 6
+    IconThickness: 1
   Corpse:
-    IconColor: Magenta
+    IconOutlineColor: Magenta
     IconShape: Cross
     IconSize: 6
     IconThickness: 2
-    LabelColor: Magenta
-    LabelFontSize: 16
-    LabelFont: 'Exocet Blizzard Mixed Caps'
     LineColor: Magenta
     LineThickness: 2
     ArrowHeadSize: 15
+    LabelColor: Magenta
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
   Portal:
-    IconColor: Yellow
+    IconOutlineColor: Yellow
     IconShape: Portal
     IconSize: 3
     IconThickness: 2
     LabelColor: Yellow
-    LabelFontSize: 16
-    LabelFont: 'Exocet Blizzard Mixed Caps'
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
   SuperChest:
-    IconColor: '17, 255, 0'
+    IconColor: 17, 255, 0
     IconShape: Square
     IconSize: 4
   NormalChest:
-    IconColor: '17, 128, 0'
+    IconColor: 17, 128, 0
     IconShape: Square
     IconSize: 3
   LockedChest:
-    IconColor: '128, 0, 0'
+    IconColor: Maroon
     IconShape: Square
     IconSize: 3
   TrappedChest:
-    IconColor: '255, 0, 0'
-    IconShape: SquareOutline
-    IconSize: 4
-    IconThickness: 1
-  Shrine:
-    IconColor: '255, 218, 100'
-    IconShape: Polygon
-    IconSize: 5
-    LabelColor: '255, 218, 100'
-    LabelFontSize: 16
-    LabelFont: 'Exocet Blizzard Mixed Caps'
-  ArmorWeapRack:
-    IconColor: '132, 132, 132'
+    IconColor: Red
     IconShape: Square
     IconSize: 4
-  Item: 
+  Shrine:
+    IconColor: 255, 218, 100
+    IconShape: Polygon
+    IconSize: 5
+    LabelColor: 255, 218, 100
+    LabelFontSize: 14
+    LabelFont: Formal 436
+    LabelTextShadow: true
+  ArmorWeapRack:
+    IconColor: 132, 132, 132
+    IconShape: Square
+    IconSize: 4
+  Item:
     IconColor: DarkOrange
     IconShape: Ellipse
     IconSize: 4
-    LabelFont: 'Exocet Blizzard Mixed Caps'
     LabelFontSize: 16
-
-## ItemLog - Alerts for in-game dropped items nearby
+    LabelFont: Exocet Blizzard Mixed Caps
+    LabelTextShadow: true
+  MissilePhysicalLarge:
+    IconColor: 255, 194, 194
+    IconShape: Ellipse
+    IconSize: 0
+  MissilePhysicalSmall:
+    IconColor: 201, 157, 157
+    IconShape: Ellipse
+    IconSize: 0
+  MissileFireLarge:
+    IconColor: 255, 0, 0
+    IconShape: Ellipse
+    IconSize: 0
+  MissileFireSmall:
+    IconColor: 194, 0, 0
+    IconShape: Ellipse
+    IconSize: 0
+  MissileIceLarge:
+    IconColor: 0, 208, 255
+    IconShape: Ellipse
+    IconSize: 0
+  MissileIceSmall:
+    IconColor: 0, 208, 255
+    IconShape: Ellipse
+    IconSize: 0
+  MissileLightLarge:
+    IconColor: 255, 255, 0
+    IconShape: Ellipse
+    IconSize: 0
+  MissileLightSmall:
+    IconColor: 163, 163, 0
+    IconShape: Ellipse
+    IconSize: 0
+  MissilePoisonLarge:
+    IconColor: 0, 255, 0
+    IconShape: Ellipse
+    IconSize: 0
+  MissilePoisonSmall:
+    IconColor: 0, 156, 0
+    IconShape: Ellipse
+    IconSize: 0
+  MissileMagicLarge:
+    IconColor: 255, 115, 0
+    IconShape: Ellipse
+    IconSize: 0
+  MissileMagicSmall:
+    IconColor: 179, 80, 0
+    IconShape: Ellipse
+    IconSize: 0
 ItemLog:
   Enabled: true
-  FilterFileName: "ItemFilter.yaml"
-  ## PlaySoundOnDrop - Play drop sound
+  Position: TopLeft
+  FilterFileName: ItemFilter.yaml
+  CheckVendorItems: false
+  CheckItemOnIdentify: false
   PlaySoundOnDrop: false
-  ## SoundFile - Name of .wav file for drop sound (put .wav file in the MapAssist folder)
-  SoundFile: ""
+  SoundFile: ''
+  SoundVolume: 0
   DisplayForSeconds: 45
-  LabelFont: "Exocet Blizzard Mixed Caps"
-  LabelFontSize: 14
-
-## MapColorConfiguration - Color schema for drawing overlay map
+  LabelFont: Exocet Blizzard Mixed Caps
+  LabelFontSize: 16
+  LabelTextShadow: true
 MapColorConfiguration:
-  Walkable:
-  Border: '255, 255, 255'
-
-## GameInfo - Display setting for game info
+  Border: 255, 255, 255
 GameInfo:
-  ## ShowGameIP - Display game server IP address
-  ShowGameIP: true
-  ## HuntingIP - Set an IP address to display in green instead of red
-  HuntingIP: 'x.x.x.x'
-  ## ShowAreaLevel - Display current area and alvl
-  ShowAreaLevel: false
-  ## ShowOverlayFPS - Developer setting, probably not useful
+  Position: TopLeft
+  ShowGameName: true
+  ShowDifficulty: true
+  ShowArea: true
+  ShowAreaLevel: true
   ShowOverlayFPS: false
-  LabelFont: "Exocet Blizzard Mixed Caps"
-  LabelFontSize: 14
-
-## Path to D2LOD installation. Optional.
-## Should only need to provide if we are not able to look it up
-## automatically via the registry
+  ShowGameTimer: true
+  ShowAreaTimer: true
+  LabelFont: Exocet Blizzard Mixed Caps
+  LabelFontSize: 16
+  LabelTextShadow: true
 D2Path: ''
+LanguageCode: enUS
+DPIAware: false

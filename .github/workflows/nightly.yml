@@ -41,7 +41,7 @@ jobs:
         run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}} /p:DebugSymbols=false
 
       - name: Zip release
-        uses: papeloto/action-zip@v1
+        uses: vimtor/action-zip@v1
         with:
           files: bin/x64/Release/ LICENSE README.md
           recursive: true

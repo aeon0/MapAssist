@@ -9,6 +9,8 @@ using System.Collections;
 using YamlDotNet.Core;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.IO;
+using System.Drawing;
 
 namespace MapAssist.Files
 {
@@ -19,7 +21,11 @@ namespace MapAssist.Files
         private static IDeserializer deserializer = new DeserializerBuilder()
                 .WithNamingConvention(PascalCaseNamingConvention.Instance)
                 .WithTypeConverter(new AreaArrayYamlTypeConverter())
+                .WithTypeConverter(new ItemYamlTypeConverter())
                 .WithTypeConverter(new ItemQualityYamlTypeConverter())
+                .WithTypeConverter(new ItemTierYamlTypeConverter())
+                .WithTypeConverter(new SkillTreeYamlTypeConverter())
+                .WithTypeConverter(new SkillsYamlTypeConverter())
                 .Build();
 
         public static T ParseConfigurationFile(string fileName)
@@ -46,9 +52,14 @@ namespace MapAssist.Files
          * a recursive merge on a field by field basis. The result of this merging is then serialized back to yaml, 
          * then deserialized again into our MapAssistConfiguration POCO.
          */
-        public static MapAssistConfiguration ParseConfigurationMain(byte[] resourcePrimary, string fileNameOverride)
+        public static MapAssistConfiguration ParseConfigurationMain(byte[] resourcePrimary, string fileNameOverride = null)
         {
             var yamlPrimary = Encoding.Default.GetString(resourcePrimary);
+
+            if (fileNameOverride == null)
+            {
+                return TryDeserialize<MapAssistConfiguration>(yamlPrimary);
+            }
 
             var fileManagerOverride = new FileManager(fileNameOverride);
             if (!fileManagerOverride.FileExists())
@@ -92,6 +103,12 @@ namespace MapAssist.Files
                 }
                 else
                 {
+                    if (tuple.Key.ToString() == "MapConfiguration") // Don't merge this object, simply take the user provided one
+                    {
+                        primary[tuple.Key] = secondary[tuple.Key];
+                        continue;
+                    }
+
                     /**
                      * Don't allow an override to try and use a null dict
                      * This allows things like below to exist in overrides without breaking anything
@@ -133,7 +150,21 @@ namespace MapAssist.Files
 
         public void SerializeToFile(T unserializedConfiguration)
         {
-            throw new System.NotImplementedException();
+            var config = MapAssistConfiguration.Loaded;
+            using (var streamWriter = new StreamWriter("Config.yaml"))
+            {
+                streamWriter.WriteLine("# Change these settings from the Config GUI provided in MapAssist");
+                var serializer = new SerializerBuilder()
+                    .WithNamingConvention(PascalCaseNamingConvention.Instance)
+                    .WithTypeConverter(new FloatPrecisionConverter())
+                    .WithTypeConverter(new AreaArrayYamlTypeConverter())
+                    .WithTypeConverter(new IconRenderingTypeConverter())
+                    .WithTypeConverter(new PointOfInterestRenderingTypeConverter())
+                    .WithTypeConverter(new PortalRenderingTypeConverter())
+                    .WithTypeConverter(new MapColorConfigurationTypeConverter())
+                    .Build();
+                serializer.Serialize(streamWriter, config);
+            }
         }
     }
 }
