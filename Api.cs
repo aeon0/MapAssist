@@ -92,7 +92,10 @@ namespace MapAssist
                                     player_pos = _gameData.PlayerPosition,
                                     area_origin = _compositor._areaData.Origin,
                                     collision_grid = _compositor._areaData.CollisionGrid,
-                                    current_area = _compositor._areaData.Area.ToString()
+                                    current_area = _compositor._areaData.Area.ToString(),
+                                    left_skill = _gameData.PlayerUnit.Skill.LeftSkillId.ToString(),
+                                    right_skill = _gameData.PlayerUnit.Skill.RightSkillId.ToString(),
+                                    used_skill = _gameData.PlayerUnit.Skill.UsedSkillId.ToString(),
                                 };
 
                                 foreach (UnitAny m in _gameData.Monsters)
