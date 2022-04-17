@@ -39,7 +39,7 @@ namespace MapAssist.Helpers
         private static readonly NLog.Logger _log = NLog.LogManager.GetCurrentClassLogger();
         public GameData _gameData;
         public AreaData _areaData;
-        public readonly IReadOnlyList<PointOfInterest> _pointsOfInterest;
+        public IReadOnlyList<PointOfInterest> _pointsOfInterest;
         private int _frameCount = 0;
         private ExocetFont _exocetFont;
         private FormalFont _formalFont;

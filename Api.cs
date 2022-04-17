@@ -17,6 +17,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  **/
 
+using GameOverlay;
 using MapAssist.Helpers;
 using MapAssist.Types;
 using System;
@@ -25,6 +26,8 @@ using System.Net;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using static MapAssist.Types.Stats;
+
 
 namespace MapAssist
 {
@@ -33,19 +36,23 @@ namespace MapAssist
         private static readonly NLog.Logger _log = NLog.LogManager.GetCurrentClassLogger();
 
         private GameDataReader _gameDataReader;
-        private GameData _gameData;
-        private Compositor _compositor;
+        private AreaData _areaData;
+        private volatile GameData _gameData;
+        private List<PointOfInterest> _pointsOfInterest;
+        private string _currentArea = "";
+        private int _currentMapHeight = 0;
+        private int _currentMapWidth = 0;
+        private bool _disposed;
         private static readonly object _lock = new object();
 
         // Server data
         private HttpListener listener;
         private string url = "http://localhost:1111/";
-        private int requestCount = 0;
 
         public Api()
         {
             _gameDataReader = new GameDataReader();
-            GameOverlay.TimerService.EnableHighPrecisionTimers();
+            TimerService.EnableHighPrecisionTimers();
         }
 
         public async Task HandleIncomingConnections()
@@ -63,62 +70,75 @@ namespace MapAssist
                 HttpListenerResponse resp = ctx.Response;
 
                 // Print out some info about the request
-                Console.WriteLine("Request #: {0}", ++requestCount);
-                Console.WriteLine(req.Url.ToString());
-                Console.WriteLine(req.HttpMethod);
-                Console.WriteLine(req.UserHostName);
-                Console.WriteLine(req.UserAgent);
-                Console.WriteLine();
+                Console.WriteLine("Request: {0}", req.Url.AbsoluteUri);
 
                 // If `shutdown` url requested w/ POST, then shutdown the server after serving the page
                 var jsonData = "{\"success\": \"false\"}";
-                if ((req.HttpMethod == "POST") && (req.Url.AbsolutePath == "/get_data"))
+                if ((req.HttpMethod == "GET") && (req.Url.AbsolutePath == "/get_data"))
                 {
-                    if (disposed) return;
+                    if (_disposed) return;
                     try
                     {
                         lock (_lock)
                         {
-                            (_compositor, _gameData) = _gameDataReader.Get();
-                            if (_compositor != null && _gameData != null)
+                            // Check if forcemap is set
+                            var forceMap = false;
+                            if (req.QueryString.Count != 0 && req.QueryString.Get(0) == "true")
                             {
+                                forceMap = true;
+                            }
+                            Console.WriteLine(forceMap);
+                            (_gameData, _areaData, _pointsOfInterest, _) = _gameDataReader.Get();
+                            if (_gameData != null && _areaData != null && _pointsOfInterest != null)
+                            {
+                                // Figure out if we should update collison grid or not
+                                var current_area = _areaData.Area.ToString();
+                                var mapH = 0;
+                                var mapW = 0;
+                                if (_areaData.CollisionGrid != null)
+                                {
+                                    mapH = _areaData.CollisionGrid.GetLength(0);
+                                    if (mapH > 0)
+                                    {
+                                        mapW = _areaData.CollisionGrid[0].GetLength(0);
+                                    }
+                                }
+                                var map_changed = current_area != _currentArea || mapH != _currentMapHeight || mapW != _currentMapWidth;
+                                _currentArea = current_area;
+                                _currentMapHeight = mapH;
+                                _currentMapWidth = mapW;
+
+                                // Create msg
                                 var msg = new
                                 {
                                     success = true,
                                     monsters = new List<dynamic>(),
                                     objects = new List<dynamic>(),
-                                    items = new List<dynamic>(),
                                     points_of_interest = new List<dynamic>(),
                                     player_pos = _gameData.PlayerPosition,
-                                    area_origin = _compositor._areaData.Origin,
-                                    collision_grid = _compositor._areaData.CollisionGrid,
-                                    current_area = _compositor._areaData.Area.ToString(),
-                                    left_skill = _gameData.PlayerUnit.Skill.LeftSkillId.ToString(),
-                                    right_skill = _gameData.PlayerUnit.Skill.RightSkillId.ToString(),
-                                    used_skill = _gameData.PlayerUnit.Skill.UsedSkillId.ToString(),
+                                    area_origin = _areaData.Origin,
+                                    collision_grid = map_changed || forceMap ? _areaData.CollisionGrid : null,
+                                    current_area = _areaData.Area.ToString(),
                                 };
 
-                                foreach (UnitAny m in _gameData.Monsters)
+                                foreach (UnitMonster m in _gameData.Monsters)
                                 {
-                                    if (m.UnitType == UnitType.Monster)
+                                    //using (var processContext = GameManager.GetProcessContext())
+                                    //{
+                                    //    var stats = processContext.Read<MapAssist.Structs.MonStats>(m.MonsterData.pMonStats);
+                                    //}
+                                    msg.monsters.Add(new
                                     {
-                                        //using (var processContext = GameManager.GetProcessContext())
-                                        //{
-                                        //    var stats = processContext.Read<MapAssist.Structs.MonStats>(m.MonsterData.pMonStats);
-                                        //}
-                                        msg.monsters.Add(new
-                                        {
-                                            position = m.Position,
-                                            immunities = m.Immunities,
-                                            unit_type = m.UnitType.ToString(),
-                                            type = m.MonsterData.MonsterType.ToString(),
-                                            id = m.UnitId,
-                                            name = ((Npc)m.TxtFileNo).ToString()
-                                        });
-                                    }
+                                        position = m.Position,
+                                        immunities = m.Immunities,
+                                        unit_type = m.UnitType.ToString(),
+                                        type = m.MonsterData.MonsterType.ToString(),
+                                        id = m.UnitId,
+                                        name = ((Npc)m.TxtFileNo).ToString()
+                                    });
                                 }
 
-                                foreach (PointOfInterest p in _compositor._pointsOfInterest)
+                                foreach (PointOfInterest p in _pointsOfInterest)
                                 {
                                     msg.points_of_interest.Add(new
                                     {
@@ -128,33 +148,15 @@ namespace MapAssist
                                     });
                                 }
 
-                                foreach (UnitAny o in _gameData.Objects)
+                                foreach (UnitObject o in _gameData.Objects)
                                 {
-                                    if (o.UnitType == UnitType.Object)
+                                    msg.objects.Add(new
                                     {
-                                        msg.objects.Add(new
-                                        {
-                                            position = o.Position,
-                                            id = o.UnitId,
-                                            selectable = o.ObjectData.InteractType != 0x00,
-                                            name = ((GameObject)o.TxtFileNo).ToString()
-                                        });
-                                    }
-                                }
-
-                                foreach (UnitAny i in _gameData.Items)
-                                {
-                                    if (i.UnitType == UnitType.Item)
-                                    {
-                                        msg.items.Add(new
-                                        {
-                                            position = i.Position,
-                                            id = i.UnitId,
-                                            flags = i.ItemData.ItemFlags,
-                                            quality = i.ItemData.ItemQuality,
-                                            name = Items.ItemName(i.TxtFileNo)
-                                        });
-                                    }
+                                        position = o.Position,
+                                        id = o.UnitId,
+                                        selectable = o.ObjectData.InteractType != 0x00,
+                                        name = ((GameObject)o.TxtFileNo).ToString()
+                                    });
                                 }
 
                                 jsonData = JsonConvert.SerializeObject(msg);
@@ -164,7 +166,6 @@ namespace MapAssist
                     catch (Exception ex)
                     {
                         _log.Error(ex);
-                        GameManager.ResetPlayerUnit();
                     }
                 }
 
@@ -195,18 +196,16 @@ namespace MapAssist
 
         ~Api() => Dispose();
 
-        private bool disposed = false;
-
         public void Dispose()
         {
             // Close the listener
             listener.Close();
             lock (_lock)
             {
-                if (!disposed)
+                if (!_disposed)
                 {
-                    disposed = true; // This first to let GraphicsWindow.DrawGraphics know to return instantly
-                    if (_compositor != null) _compositor.Dispose(); // This last so it's disposed after GraphicsWindow stops using it
+                    _disposed = true; // This first to let GraphicsWindow.DrawGraphics know to return instantly
+                    // if (_compositor != null) _compositor.Dispose(); // This last so it's disposed after GraphicsWindow stops using it
                 }
             }
         }
