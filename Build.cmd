@@ -1,0 +1,1 @@
+"C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe" MapAssist.sln /p:OutDir=bin\x64\Release /p:Configuration=Release /t:MapAssist:Rebuild

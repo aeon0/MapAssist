@@ -52,13 +52,21 @@ namespace MapAssist.Helpers
         private static IntPtr _LastHoverDataOffset;
 
         private static WindowsExternal.WinEventDelegate _eventDelegate = null;
+        public static Process[] d2_proc;
 
         public static void MonitorForegroundWindow()
         {
-            _eventDelegate = new WindowsExternal.WinEventDelegate(WinEventProc);
-            _winHook = WindowsExternal.SetWinEventHook(WindowsExternal.EVENT_SYSTEM_FOREGROUND, WindowsExternal.EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, _eventDelegate, 0, 0, WindowsExternal.WINEVENT_OUTOFCONTEXT);
+            //_eventDelegate = new WindowsExternal.WinEventDelegate(WinEventProc);
+            //_winHook = WindowsExternal.SetWinEventHook(WindowsExternal.EVENT_SYSTEM_FOREGROUND, WindowsExternal.EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, _eventDelegate, 0, 0, WindowsExternal.WINEVENT_OUTOFCONTEXT);
 
-            SetActiveWindow(WindowsExternal.GetForegroundWindow()); // Needed once to start, afterwards the hook will provide updates
+            //SetActiveWindow(WindowsExternal.GetForegroundWindow()); // Needed once to start, afterwards the hook will provide updates
+            d2_proc = Process.GetProcessesByName("D2r");
+            if (d2_proc.Length > 0)
+            {
+                IntPtr hwnd = d2_proc[0].MainWindowHandle;
+                //Console.WriteLine(hwnd);
+                SetActiveWindow(hwnd);
+            }
         }
 
         private static void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)

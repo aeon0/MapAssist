@@ -44,10 +44,10 @@ namespace MapAssist.Helpers
 
         public static GameData GetGameData()
         {
-            if (!MapAssistConfiguration.Loaded.RenderingConfiguration.StickToLastGameWindow && !GameManager.IsGameInForeground)
-            {
-                return null;
-            }
+            //if (!MapAssistConfiguration.Loaded.RenderingConfiguration.StickToLastGameWindow && !GameManager.IsGameInForeground)
+            //{
+            //    return null;
+            //}
 
             var processContext = GameManager.GetProcessContext();
 
@@ -183,6 +183,7 @@ namespace MapAssist.Helpers
                 }
                 else
                 {
+                    _log.Info("New Game detected");
                     UpdateMemoryData();
                     _lastMapSeeds[_currentProcessId] = mapSeed;
                     _playerMapChanged[_currentProcessId] = true;
@@ -252,10 +253,10 @@ namespace MapAssist.Helpers
                 var rawItemUnits = new List<UnitItem>();
                 foreach (var item in allItems)
                 {
-                    if (item.IsPlayerOwned && item.IsIdentified && !Items.InventoryItemUnitIdsToSkip[_currentProcessId].Contains(item.UnitId))
-                    {
-                        item.IsCached = false;
-                    }
+                    //if (item.IsPlayerOwned && item.IsIdentified && !Items.InventoryItemUnitIdsToSkip[_currentProcessId].Contains(item.UnitId))
+                    //{
+                    item.IsCached = false;
+                    //}
 
                     var checkInventoryItem = Items.CheckInventoryItem(item, _currentProcessId);
 
@@ -277,13 +278,13 @@ namespace MapAssist.Helpers
                         cache[item.HashString] = item;
                     }
 
-                    if (Items.ItemUnitIdsToSkip[_currentProcessId].Contains(item.UnitId)) continue;
+                    //if (Items.ItemUnitIdsToSkip[_currentProcessId].Contains(item.UnitId)) continue;
 
-                    if (_playerMapChanged[_currentProcessId] && item.IsAnyPlayerHolding && item.Item != Item.HoradricCube && !Items.ItemUnitIdsToSkip[_currentProcessId].Contains(item.UnitId))
-                    {
-                        Items.ItemUnitIdsToSkip[_currentProcessId].Add(item.UnitId);
-                        continue;
-                    }
+                    //if (_playerMapChanged[_currentProcessId] && item.IsAnyPlayerHolding && item.Item != Item.HoradricCube && !Items.ItemUnitIdsToSkip[_currentProcessId].Contains(item.UnitId))
+                    //{
+                    //    Items.ItemUnitIdsToSkip[_currentProcessId].Add(item.UnitId);
+                    //    continue;
+                    //}
 
                     if (item.UnitId == uint.MaxValue) continue;
 

@@ -254,11 +254,11 @@ ItemLog:
   Enabled: true
   Position: TopLeft
   FilterFileName: ItemFilter.yaml
-  CheckVendorItems: false
-  CheckItemOnIdentify: false
-  PlaySoundOnDrop: false
+  CheckVendorItems: true
+  CheckItemOnIdentify: true
+  PlaySoundOnDrop: true
   SoundFile: ''
-  SoundVolume: 0
+  SoundVolume: 100
   DisplayForSeconds: 45
   LabelFont: Exocet Blizzard Mixed Caps
   LabelFontSize: 16
