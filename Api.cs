@@ -86,8 +86,9 @@ namespace MapAssist
                             if (req.QueryString.Count != 0 && req.QueryString.Get(0) == "true")
                             {
                                 forceMap = true;
+                                Console.WriteLine("Force Map update");
                             }
-                            Console.WriteLine(forceMap);
+                            
                             (_gameData, _areaData, _pointsOfInterest, _) = _gameDataReader.Get();
                             if (_gameData != null && _areaData != null && _pointsOfInterest != null)
                             {
@@ -160,6 +161,12 @@ namespace MapAssist
                                 }
 
                                 jsonData = JsonConvert.SerializeObject(msg);
+                            }
+                            else
+                            {
+                                _currentArea = "";
+                                _currentMapHeight = 0;
+                                _currentMapWidth = 0;
                             }
                         }
                     }
