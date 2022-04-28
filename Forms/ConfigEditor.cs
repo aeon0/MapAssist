@@ -4,6 +4,7 @@ using MapAssist.Types;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 
@@ -155,6 +156,12 @@ namespace MapAssist
             {
                 lstHidden.Items.Add(AreaExtensions.Name(area));
             }
+
+            foreach (var authorizedWindowTitle in MapAssistConfiguration.Loaded.AuthorizedWindowTitles)
+            {
+                lstAuthorizedWindowTitle.Items.Add(authorizedWindowTitle);
+            }
+
             chkDPIAware.Checked = MapAssistConfiguration.Loaded.DPIAware;
         }
 
@@ -352,6 +359,7 @@ namespace MapAssist
         {
             MapAssistConfiguration.Loaded.GameInfo.ShowArea = chkShowArea.Checked;
         }
+
         private void txtD2Path_TextChanged(object sender, EventArgs e)
         {
             MapAssistConfiguration.Loaded.D2LoDPath = txtD2Path.Text;
@@ -564,8 +572,8 @@ namespace MapAssist
         private void btnFont_Click(object sender, EventArgs e)
         {
             dynamic labelProp = SelectedProperty.GetValue(MapAssistConfiguration.Loaded.MapConfiguration, null);
-            var labelFont = labelProp.LabelFont;
-            var labelSize = labelProp.LabelFontSize;
+            var labelFont = (string)labelProp.LabelFont;
+            var labelSize = (float)labelProp.LabelFontSize;
             if (labelFont == null)
             {
                 labelFont = "Helvetica";
@@ -836,6 +844,28 @@ namespace MapAssist
                 var hiddenList = new List<Area>(MapAssistConfiguration.Loaded.HiddenAreas);
                 hiddenList.RemoveAt(indexToRemove);
                 MapAssistConfiguration.Loaded.HiddenAreas = hiddenList.ToArray();
+            }
+        }
+
+        private void btnAddAuthorizedWindowTitle_Click(object sender, EventArgs e)
+        {
+            if (txtAuthorizedWindowTitle.Text.Length > 0)
+            {
+                lstAuthorizedWindowTitle.Items.Add(txtAuthorizedWindowTitle.Text);
+                MapAssistConfiguration.Loaded.AuthorizedWindowTitles = MapAssistConfiguration.Loaded.AuthorizedWindowTitles.Append(txtAuthorizedWindowTitle.Text).ToArray();
+                txtAuthorizedWindowTitle.Text = "";
+            }
+        }
+
+        private void btnRemoveAuthorizedWindowTitle_Click(object sender, EventArgs e)
+        {
+            var indexToRemove = lstAuthorizedWindowTitle.SelectedIndex;
+            if (indexToRemove >= 0)
+            {
+                lstAuthorizedWindowTitle.Items.RemoveAt(indexToRemove);
+                var authorizedWindowTitleList = new List<string>(MapAssistConfiguration.Loaded.AuthorizedWindowTitles);
+                authorizedWindowTitleList.RemoveAt(indexToRemove);
+                MapAssistConfiguration.Loaded.AuthorizedWindowTitles = authorizedWindowTitleList.ToArray();
             }
         }
 

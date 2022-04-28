@@ -22,6 +22,7 @@ using MapAssist.Structs;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 
 namespace MapAssist.Helpers
@@ -47,6 +48,7 @@ namespace MapAssist.Helpers
         private static IntPtr _GameNameOffset;
         private static IntPtr _MenuPanelOpenOffset;
         private static IntPtr _MenuDataOffset;
+        private static IntPtr _MapSeedOffset;
         private static IntPtr _RosterDataOffset;
         private static IntPtr _InteractedNpcOffset;
         private static IntPtr _LastHoverDataOffset;
@@ -97,6 +99,13 @@ namespace MapAssist.Helpers
             try // The process can end before this block is done, hence wrap it in a try catch
             {
                 process = Process.GetProcessById(_foregroundProcessId); // If closing another non-foreground window, Process.GetProcessById can fail
+
+                // Skip process by window title
+                if (MapAssistConfiguration.Loaded.AuthorizedWindowTitles.Length != 0 && !MapAssistConfiguration.Loaded.AuthorizedWindowTitles.Any(process.MainWindowTitle.Contains))
+                {
+                    _log.Info($"Skipping window because of title (handle: {hwnd})");
+                    return;
+                }
 
                 if (process.ProcessName != ProcessName) // Not a valid game process
                 {
@@ -252,6 +261,24 @@ namespace MapAssist.Helpers
                 }
 
                 return _MenuDataOffset;
+            }
+        }
+
+        public static IntPtr MapSeedOffset
+        {
+            get
+            {
+                if (_MapSeedOffset != IntPtr.Zero)
+                {
+                    return _MapSeedOffset;
+                }
+
+                using (var processContext = GetProcessContext())
+                {
+                    _MapSeedOffset = (IntPtr)processContext.GetMapSeedOffset();
+                }
+
+                return _MapSeedOffset;
             }
         }
 
