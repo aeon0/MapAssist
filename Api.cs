@@ -70,7 +70,7 @@ namespace MapAssist
                 HttpListenerResponse resp = ctx.Response;
 
                 // Print out some info about the request
-                Console.WriteLine("Request: {0}", req.Url.AbsoluteUri);
+                // Console.WriteLine("Request: {0}", req.Url.AbsoluteUri);
 
                 // If `shutdown` url requested w/ POST, then shutdown the server after serving the page
                 var jsonData = "{\"success\": \"false\"}";
@@ -86,7 +86,7 @@ namespace MapAssist
                             if (req.QueryString.Count != 0 && req.QueryString.Get(0) == "true")
                             {
                                 forceMap = true;
-                                Console.WriteLine("Force Map update");
+                                // Console.WriteLine("Force Map update");
                             }
                             
                             (_gameData, _areaData, _pointsOfInterest, _) = _gameDataReader.Get();
@@ -120,6 +120,9 @@ namespace MapAssist
                                     area_origin = _areaData.Origin,
                                     collision_grid = map_changed || forceMap ? _areaData.CollisionGrid : null,
                                     current_area = _areaData.Area.ToString(),
+                                    left_skill = _gameData.PlayerUnit.Skills.LeftSkillId.ToString(),
+                                    right_skill = _gameData.PlayerUnit.Skills.RightSkillId.ToString(),
+                                    used_skill = _gameData.PlayerUnit.Skills.UsedSkillId.ToString(),
                                 };
 
                                 foreach (UnitMonster m in _gameData.Monsters)

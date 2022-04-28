@@ -30,7 +30,7 @@ using System.Windows.Forms;
 
 namespace MapAssist
 {
-    internal static class Program
+    public static class Program
     {
         private static readonly string githubSha = "GITHUB_SHA";
         private static readonly string githubRunNumber = "GITHUB_RUN_NUMBER";
@@ -51,7 +51,7 @@ namespace MapAssist
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
-        private static void Main()
+        public static void Main()
         {
             try
             {

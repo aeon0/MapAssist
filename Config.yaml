@@ -258,7 +258,7 @@ ItemLog:
   CheckItemOnIdentify: true
   PlaySoundOnDrop: true
   SoundFile: ''
-  SoundVolume: 100
+  SoundVolume: 0
   DisplayForSeconds: 45
   LabelFont: Exocet Blizzard Mixed Caps
   LabelFontSize: 16
