@@ -170,10 +170,15 @@
             this.btnRemoveHidden = new System.Windows.Forms.Button();
             this.btnAddHidden = new System.Windows.Forms.Button();
             this.lstHidden = new System.Windows.Forms.ListBox();
+            this.groupBoxAuthorizedWindowTitle = new System.Windows.Forms.GroupBox();
+            this.btnRemoveAuthorizedWindowTitle = new System.Windows.Forms.Button();
+            this.btnAddAuthorizedWindowTitle = new System.Windows.Forms.Button();
+            this.lstAuthorizedWindowTitle = new System.Windows.Forms.ListBox();
             this.groupBox8 = new System.Windows.Forms.GroupBox();
+            this.label3 = new System.Windows.Forms.Label();
             this.chkDPIAware = new System.Windows.Forms.CheckBox();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
-            this.label3 = new System.Windows.Forms.Label();
+            this.txtAuthorizedWindowTitle = new System.Windows.Forms.TextBox();
             this.tabControl1.SuspendLayout();
             this.tabPage5.SuspendLayout();
             this.groupBox5.SuspendLayout();
@@ -207,6 +212,7 @@
             this.grpHotkeys.SuspendLayout();
             this.tabPage4.SuspendLayout();
             this.groupBox2.SuspendLayout();
+            this.groupBoxAuthorizedWindowTitle.SuspendLayout();
             this.groupBox8.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -472,7 +478,7 @@
             this.tabPage1.Location = new System.Drawing.Point(4, 22);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(359, 305);
+            this.tabPage1.Size = new System.Drawing.Size(359, 325);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Map";
             this.tabPage1.UseVisualStyleBackColor = true;
@@ -779,7 +785,7 @@
             this.tabPage3.Location = new System.Drawing.Point(4, 22);
             this.tabPage3.Name = "tabPage3";
             this.tabPage3.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage3.Size = new System.Drawing.Size(359, 305);
+            this.tabPage3.Size = new System.Drawing.Size(359, 325);
             this.tabPage3.TabIndex = 2;
             this.tabPage3.Text = "Overlay";
             this.tabPage3.UseVisualStyleBackColor = true;
@@ -1009,7 +1015,7 @@
             this.tabPage2.Location = new System.Drawing.Point(4, 22);
             this.tabPage2.Name = "tabPage2";
             this.tabPage2.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage2.Size = new System.Drawing.Size(359, 305);
+            this.tabPage2.Size = new System.Drawing.Size(359, 325);
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Drawing";
             this.tabPage2.UseVisualStyleBackColor = true;
@@ -1667,7 +1673,7 @@
             this.tabPage7.Location = new System.Drawing.Point(4, 22);
             this.tabPage7.Name = "tabPage7";
             this.tabPage7.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage7.Size = new System.Drawing.Size(359, 305);
+            this.tabPage7.Size = new System.Drawing.Size(359, 325);
             this.tabPage7.TabIndex = 6;
             this.tabPage7.Text = "Hotkeys";
             this.tabPage7.UseVisualStyleBackColor = true;
@@ -1810,6 +1816,7 @@
             // tabPage4
             // 
             this.tabPage4.Controls.Add(this.groupBox2);
+            this.tabPage4.Controls.Add(this.groupBoxAuthorizedWindowTitle);
             this.tabPage4.Controls.Add(this.groupBox8);
             this.tabPage4.Location = new System.Drawing.Point(4, 22);
             this.tabPage4.Name = "tabPage4";
@@ -1825,7 +1832,7 @@
             this.groupBox2.Controls.Add(this.lstHidden);
             this.groupBox2.Location = new System.Drawing.Point(11, 9);
             this.groupBox2.Name = "groupBox2";
-            this.groupBox2.Size = new System.Drawing.Size(335, 189);
+            this.groupBox2.Size = new System.Drawing.Size(335, 100);
             this.groupBox2.TabIndex = 2;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Hidden Areas";
@@ -1855,20 +1862,72 @@
             this.lstHidden.FormattingEnabled = true;
             this.lstHidden.Location = new System.Drawing.Point(10, 19);
             this.lstHidden.Name = "lstHidden";
-            this.lstHidden.Size = new System.Drawing.Size(293, 160);
+            this.lstHidden.Size = new System.Drawing.Size(293, 69);
             this.lstHidden.TabIndex = 0;
+            // 
+            // groupBoxAuthorizedWindowTitle
+            // 
+            this.groupBoxAuthorizedWindowTitle.Controls.Add(this.txtAuthorizedWindowTitle);
+            this.groupBoxAuthorizedWindowTitle.Controls.Add(this.btnRemoveAuthorizedWindowTitle);
+            this.groupBoxAuthorizedWindowTitle.Controls.Add(this.btnAddAuthorizedWindowTitle);
+            this.groupBoxAuthorizedWindowTitle.Controls.Add(this.lstAuthorizedWindowTitle);
+            this.groupBoxAuthorizedWindowTitle.Location = new System.Drawing.Point(11, 115);
+            this.groupBoxAuthorizedWindowTitle.Name = "groupBoxAuthorizedWindowTitle";
+            this.groupBoxAuthorizedWindowTitle.Size = new System.Drawing.Size(335, 124);
+            this.groupBoxAuthorizedWindowTitle.TabIndex = 2;
+            this.groupBoxAuthorizedWindowTitle.TabStop = false;
+            this.groupBoxAuthorizedWindowTitle.Text = "Authorized Window Titles";
+            // 
+            // btnRemoveAuthorizedWindowTitle
+            // 
+            this.btnRemoveAuthorizedWindowTitle.Location = new System.Drawing.Point(309, 44);
+            this.btnRemoveAuthorizedWindowTitle.Name = "btnRemoveAuthorizedWindowTitle";
+            this.btnRemoveAuthorizedWindowTitle.Size = new System.Drawing.Size(20, 23);
+            this.btnRemoveAuthorizedWindowTitle.TabIndex = 2;
+            this.btnRemoveAuthorizedWindowTitle.Text = "-";
+            this.btnRemoveAuthorizedWindowTitle.UseVisualStyleBackColor = true;
+            this.btnRemoveAuthorizedWindowTitle.Click += new System.EventHandler(this.btnRemoveAuthorizedWindowTitle_Click);
+            // 
+            // btnAddAuthorizedWindowTitle
+            // 
+            this.btnAddAuthorizedWindowTitle.Location = new System.Drawing.Point(309, 92);
+            this.btnAddAuthorizedWindowTitle.Name = "btnAddAuthorizedWindowTitle";
+            this.btnAddAuthorizedWindowTitle.Size = new System.Drawing.Size(20, 23);
+            this.btnAddAuthorizedWindowTitle.TabIndex = 1;
+            this.btnAddAuthorizedWindowTitle.Text = "+";
+            this.btnAddAuthorizedWindowTitle.UseVisualStyleBackColor = true;
+            this.btnAddAuthorizedWindowTitle.Click += new System.EventHandler(this.btnAddAuthorizedWindowTitle_Click);
+            // 
+            // lstAuthorizedWindowTitle
+            // 
+            this.lstAuthorizedWindowTitle.FormattingEnabled = true;
+            this.lstAuthorizedWindowTitle.Location = new System.Drawing.Point(10, 19);
+            this.lstAuthorizedWindowTitle.Name = "lstAuthorizedWindowTitle";
+            this.lstAuthorizedWindowTitle.Size = new System.Drawing.Size(293, 69);
+            this.lstAuthorizedWindowTitle.TabIndex = 0;
             // 
             // groupBox8
             // 
             this.groupBox8.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.groupBox8.Controls.Add(this.label3);
             this.groupBox8.Controls.Add(this.chkDPIAware);
-            this.groupBox8.Location = new System.Drawing.Point(11, 200);
+            this.groupBox8.Location = new System.Drawing.Point(11, 245);
             this.groupBox8.Name = "groupBox8";
             this.groupBox8.Size = new System.Drawing.Size(335, 58);
             this.groupBox8.TabIndex = 29;
             this.groupBox8.TabStop = false;
             this.groupBox8.Text = "High DPI";
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 7F);
+            this.label3.ForeColor = System.Drawing.SystemColors.ControlDarkDark;
+            this.label3.Location = new System.Drawing.Point(7, 36);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(80, 13);
+            this.label3.TabIndex = 28;
+            this.label3.Text = "Requires restart";
             // 
             // chkDPIAware
             // 
@@ -1881,16 +1940,12 @@
             this.chkDPIAware.UseVisualStyleBackColor = true;
             this.chkDPIAware.CheckedChanged += new System.EventHandler(this.chkDPIAware_CheckedChanged);
             // 
-            // label3
+            // txtAuthorizedWindowTitle
             // 
-            this.label3.AutoSize = true;
-            this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 7F);
-            this.label3.ForeColor = System.Drawing.SystemColors.ControlDarkDark;
-            this.label3.Location = new System.Drawing.Point(7, 36);
-            this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(80, 13);
-            this.label3.TabIndex = 28;
-            this.label3.Text = "Requires restart";
+            this.txtAuthorizedWindowTitle.Location = new System.Drawing.Point(10, 94);
+            this.txtAuthorizedWindowTitle.Name = "txtAuthorizedWindowTitle";
+            this.txtAuthorizedWindowTitle.Size = new System.Drawing.Size(293, 20);
+            this.txtAuthorizedWindowTitle.TabIndex = 3;
             // 
             // ConfigEditor
             // 
@@ -1951,6 +2006,8 @@
             this.grpHotkeys.PerformLayout();
             this.tabPage4.ResumeLayout(false);
             this.groupBox2.ResumeLayout(false);
+            this.groupBoxAuthorizedWindowTitle.ResumeLayout(false);
+            this.groupBoxAuthorizedWindowTitle.PerformLayout();
             this.groupBox8.ResumeLayout(false);
             this.groupBox8.PerformLayout();
             this.ResumeLayout(false);
@@ -2007,9 +2064,13 @@
         private System.Windows.Forms.Label lblLineArrowSizeValue;
         private System.Windows.Forms.CheckBox chkShowArea;
         private System.Windows.Forms.GroupBox groupBox2;
+        private System.Windows.Forms.GroupBox groupBoxAuthorizedWindowTitle;
         private System.Windows.Forms.Button btnRemoveHidden;
         private System.Windows.Forms.Button btnAddHidden;
         private System.Windows.Forms.ListBox lstHidden;
+        private System.Windows.Forms.Button btnRemoveAuthorizedWindowTitle;
+        private System.Windows.Forms.Button btnAddAuthorizedWindowTitle;
+        private System.Windows.Forms.ListBox lstAuthorizedWindowTitle;
         private System.Windows.Forms.Button btnBrowseD2Location;
         private System.Windows.Forms.FolderBrowserDialog folderBrowserDialog1;
         private System.Windows.Forms.Label lblSoundVolumeValue;
@@ -2104,5 +2165,6 @@
         private System.Windows.Forms.GroupBox groupBox8;
         private System.Windows.Forms.CheckBox chkDPIAware;
         private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.TextBox txtAuthorizedWindowTitle;
     }
 }

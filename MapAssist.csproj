@@ -106,16 +106,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AddAreaForm.cs">
+    <Compile Include="Forms\AddAreaForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="AddAreaForm.Designer.cs">
+    <Compile Include="Forms\AddAreaForm.Designer.cs">
       <DependentUpon>AddAreaForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="ConfigEditor.cs">
+    <Compile Include="Forms\ConfigEditor.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="ConfigEditor.Designer.cs">
+    <Compile Include="Forms\ConfigEditor.Designer.cs">
       <DependentUpon>ConfigEditor.cs</DependentUpon>
     </Compile>
     <Compile Include="Files\ConfigurationParser.cs" />
@@ -149,6 +149,7 @@
     </Compile>
     <Compile Include="Settings\LootLogConfiguration.cs" />
     <Compile Include="Settings\MapAssistConfiguration.cs" />
+    <Compile Include="Structs\MapSeed.cs" />
     <Compile Include="Structs\Act.cs" />
     <Compile Include="Structs\ActMisc.cs" />
     <Compile Include="Structs\Inventory.cs" />
@@ -172,6 +173,7 @@
     <Compile Include="Types\Items.cs" />
     <Compile Include="Types\Missile.cs" />
     <Compile Include="Types\Roster.cs" />
+    <Compile Include="Types\MapSeed.cs" />
     <Compile Include="Types\Session.cs" />
     <Compile Include="Types\Shrine.cs" />
     <Compile Include="Types\Skill.cs" />
@@ -201,7 +203,7 @@
     <Compile Include="Types\UnitMonster.cs" />
     <Compile Include="Types\UnitItem.cs" />
     <Compile Include="Types\UnitType.cs" />
-    <EmbeddedResource Include="AddAreaForm.resx">
+    <EmbeddedResource Include="Forms\AddAreaForm.resx">
       <DependentUpon>AddAreaForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Fonts\exocetblizzardot-medium.otf" />
@@ -249,7 +251,7 @@
     <None Include="Resources\Ching.wav" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="ConfigEditor.resx">
+    <EmbeddedResource Include="Forms\ConfigEditor.resx">
       <DependentUpon>ConfigEditor.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">

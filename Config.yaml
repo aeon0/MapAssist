@@ -8,6 +8,7 @@ HotkeyConfiguration:
   ExportItemsKey: F9
 HiddenAreas:
 - Forgotten Tower
+AuthorizedWindowTitles: []
 RenderingConfiguration:
   Opacity: 0.5
   IconOpacity: 0.9
@@ -16,7 +17,7 @@ RenderingConfiguration:
   MonsterHealthBar: true
   ToggleViaInGameMap: false
   ToggleViaInGamePanels: true
-  StickToLastGameWindow: false
+  StickToLastGameWindow: true
   Size: 800
   ZoomLevel: 1
   BuffSize: 1
