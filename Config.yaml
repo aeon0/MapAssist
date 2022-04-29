@@ -10,8 +10,8 @@ HiddenAreas:
 - Forgotten Tower
 AuthorizedWindowTitles: []
 RenderingConfiguration:
-  Opacity: 1.0
-  IconOpacity: 1.0
+  Opacity: 0.3
+  IconOpacity: 0.4
   OverlayMode: false
   Position: Center
   MonsterHealthBar: false
