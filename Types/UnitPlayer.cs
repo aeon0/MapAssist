@@ -12,7 +12,6 @@ namespace MapAssist.Types
         public string Name { get; private set; }
         public Act Act { get; private set; }
         public Skills Skills { get; private set; }
-        public List<State> StateList { get; private set; }
         public bool InParty { get; private set; }
         public bool IsHostile { get; private set; }
         public RosterEntry RosterEntry { get; private set; }
@@ -27,7 +26,7 @@ namespace MapAssist.Types
             {
                 using (var processContext = GameManager.GetProcessContext())
                 {
-                    Name = Encoding.ASCII.GetString(processContext.Read<byte>(Struct.pUnitData, 16)).TrimEnd((char)0);
+                    Name = Encoding.UTF8.GetString(processContext.Read<byte>(Struct.pUnitData, 16)).TrimEnd((char)0);
                     Act = new Act(Struct.pAct);
                     //Inventory = processContext.Read<Inventory>(Struct.ptrInventory);
                     Skills = new Skills(Struct.pSkills);
@@ -127,19 +126,6 @@ namespace MapAssist.Types
             return false;
         }
 
-        private List<State> GetStateList()
-        {
-            var stateList = new List<State>();
-            for (var i = 0; i <= States.StateCount; i++)
-            {
-                if (GetState((State)i))
-                {
-                    stateList.Add((State)i);
-                }
-            }
-            return stateList;
-        }
-
         public UnitItem[][] BeltItems { get; set; } = new UnitItem[][] { };
         public int BeltSize => BeltItems.Length > 0 ? BeltItems[0].Length : 0;
         public float Life => Stats.TryGetValue(Types.Stats.Stat.Life, out var val) && Types.Stats.StatShifts.TryGetValue(Types.Stats.Stat.Life, out var shift) ? val >> shift : 0;
@@ -148,6 +134,7 @@ namespace MapAssist.Types
         public float MaxMana => Stats.TryGetValue(Types.Stats.Stat.MaxMana, out var val) && Types.Stats.StatShifts.TryGetValue(Types.Stats.Stat.Life, out var shift) ? val >> shift : 0;
         public float LifePercentage => 100f * Life / MaxLife;
         public float ManaPercentage => 100f * Mana / MaxMana;
+        public int Level => Stats.TryGetValue(Types.Stats.Stat.Level, out var lvl) ? lvl : 0;
 
         public long Experience
         {
@@ -163,12 +150,12 @@ namespace MapAssist.Types
         {
             get
             {
-                if (Stats.TryGetValue(Types.Stats.Stat.Level, out var lvl) && lvl > 0)
+                if (Level > 0)
                 {
-                    if (lvl == 99) return 100f;
+                    if (Level == 99) return 100f;
 
-                    var numer = Experience - PlayerLevelsExp[lvl - 1];
-                    var denom = PlayerLevelsExp[lvl] - PlayerLevelsExp[lvl - 1];
+                    var numer = Experience - PlayerLevelsExp[Level - 1];
+                    var denom = PlayerLevelsExp[Level] - PlayerLevelsExp[Level - 1];
 
                     return 100f * numer / denom;
                 }
@@ -193,11 +180,6 @@ namespace MapAssist.Types
 
                 return Math.Min(res - penalty, 75 + maxRes);
             });
-        }
-
-        private bool GetState(State state)
-        {
-            return (StateFlags[(int)state >> 5] & StateMasks.gdwBitMasks[(int)state & 31]) > 0;
         }
 
         public override string HashString => Name + "/" + Position.X + "/" + Position.Y;

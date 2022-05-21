@@ -1,22 +1,3 @@
-/**
-*   Copyright (C) 2021 okaygo
-*
-*   https://github.com/misterokaygo/MapAssist/
-*
-*  This program is free software: you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation, either version 3 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-**/
-
 using MapAssist.Helpers;
 using MapAssist.Settings;
 using System.Collections.Generic;
@@ -75,6 +56,7 @@ namespace MapAssist.Types
             { 352, Npc.Hydra2 },
             { 353, Npc.Hydra3 },
             { 355, Npc.SevenTombs },
+            { 356, Npc.Decoy },
             { 357, Npc.Valkyrie },
             { 359, Npc.IronWolf },
             { 363, Npc.NecroSkeleton },
@@ -89,6 +71,7 @@ namespace MapAssist.Types
             { 410, Npc.WakeOfDestruction },
             { 411, Npc.ChargedBoltSentry },
             { 412, Npc.LightningSentry },
+            { 413, Npc.BladeCreeper },
             { 414, Npc.InvisiblePet },
             { 415, Npc.InfernoSentry },
             { 416, Npc.DeathSentry },
@@ -97,8 +80,10 @@ namespace MapAssist.Types
             { 419, Npc.DruidHawk },
             { 420, Npc.DruidSpiritWolf },
             { 421, Npc.DruidFenris },
+            { 422, Npc.SpiritOfBarbs },
             { 423, Npc.HeartOfWolverine },
             { 424, Npc.OakSage },
+            { 425, Npc.DruidPlaguePoppy },
             { 428, Npc.DruidBear },
             { 543, Npc.BaalThrone },
             { 567, Npc.InjuredBarbarian },
@@ -169,7 +154,7 @@ namespace MapAssist.Types
             { "Megaflow Rectifier", "minion1" },
             { "Eyeback Unleashed", "deathmauler1" },
             { "Threash Socket", "siegebeast3" },
-            { "Pindleskin", "reanimatedhorde" },
+            { "Pindleskin", "reanimatedhorde5" },
             { "Snapchip Shatter", "frozenhorror1" },
             { "Anodized Elite", "succubus4" },
             { "Vinvear Molech", "succubuswitch2" },

@@ -146,7 +146,8 @@ namespace MapAssist.Helpers
                     baseName = item.ItemBaseName,
                     quality = item.ItemData.ItemQuality.ToString(),
                     fullName = Items.ItemFullName(item),
-                    ethereal = ((item.ItemData.ItemFlags & ItemFlags.IFLAG_ETHEREAL) == ItemFlags.IFLAG_ETHEREAL),
+                    runeWord = item.IsRuneWord ? Items.GetRunewordFromId(item.Prefixes[0]) : null,
+                    ethereal = item.IsEthereal,
                     identified = item.IsIdentified,
                     numSockets = numSockets,
                     position = new Position() { x = (uint)item.Position.X, y = (uint)item.Position.Y },
@@ -173,9 +174,13 @@ namespace MapAssist.Helpers
                     {
                         finalValue = Items.GetItemStatShifted(item, stat).ToString();
                     }
-                    else if (Stats.StatDivisors.ContainsKey(stat))
+                    else if (Stats.StatDivisors.ContainsKey(stat) || Stats.StatInvertDivisors.ContainsKey(stat))
                     {
                         finalValue = Items.GetItemStatDecimal(item, stat).ToString();
+                    }
+                    else if (Stats.NegativeValueStats.Contains(stat))
+                    {
+                        finalValue = (-value).ToString();
                     }
                     else if (stat == Stats.Stat.AddClassSkills)
                     {
@@ -185,13 +190,13 @@ namespace MapAssist.Helpers
                     }
                     else if (stat == Stats.Stat.AddSkillTab)
                     {
-                        var (skillTrees, points) = Items.GetItemStatAddSkillTreeSkills(item, (SkillTree)layer);
+                        var (skillTrees, points) = Items.GetItemStatAddSkillTreeSkills(item, (SkillTree)layer, false);
                         name = AddSpaces(skillTrees[0].ToString());
                         finalValue = points.ToString();
                     }
                     else if (stat == Stats.Stat.SingleSkill || stat == Stats.Stat.NonClassSkill)
                     {
-                        var (skills, points) = Items.GetItemStatAddSingleSkills(item, (Skill)layer);
+                        var (skills, points) = Items.GetItemStatAddSingleSkills(item, (Skill)layer, false);
                         name = AddSpaces(skills[0].ToString());
                         finalValue = points.ToString();
                     }
@@ -213,11 +218,11 @@ namespace MapAssist.Helpers
                     else if (stat.ToString().StartsWith("SkillOn"))
                     {
                         var skill = (Skill)(layer >> 6);
-                        var chance = layer % (1 << 6);
+                        var level = layer % (1 << 6);
 
                         name = AddSpaces(skill.ToString()) + " On " + AddSpaces(stat.ToString().Replace("SkillOn", ""));
 
-                        finalValue = $"Level {value} ({chance}% chance)";
+                        finalValue = $"Level {level} ({value}% chance)";
                     }
                     else if (stat == Stats.Stat.Aura)
                     {

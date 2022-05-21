@@ -1,28 +1,10 @@
-﻿/**
- *   Copyright (C) 2021 okaygo
- *
- *   https://github.com/misterokaygo/MapAssist/
- *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
- **/
-
-using GameOverlay.Drawing;
+﻿using GameOverlay.Drawing;
 using MapAssist.Helpers;
 using MapAssist.Interfaces;
 using MapAssist.Structs;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace MapAssist.Types
 {
@@ -81,7 +63,7 @@ namespace MapAssist.Types
                 var hostileInfo = processContext.Read<HostileInfo>(hostilePtr);
                 var entry = new RosterEntry
                 {
-                    Name = member.Name,
+                    Name = Encoding.UTF8.GetString(member.Name).TrimEnd((char)0),
                     UnitId = member.UnitId,
                     PlayerClass = member.PlayerClass,
                     PlayerLevel = member.PlayerLevel,
