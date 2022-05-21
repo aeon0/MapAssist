@@ -1,27 +1,7 @@
-/**
- *   Copyright (C) 2021 okaygo
- *
- *   https://github.com/misterokaygo/MapAssist/
- *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
- **/
-
 using MapAssist.Helpers;
 using MapAssist.Settings;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using YamlDotNet.Serialization;
 
@@ -29,6 +9,8 @@ namespace MapAssist.Types
 {
     public static class Items
     {
+        private static readonly NLog.Logger _log = NLog.LogManager.GetCurrentClassLogger();
+
         public static Dictionary<int, HashSet<string>> ItemUnitHashesSeen = new Dictionary<int, HashSet<string>>();
         public static Dictionary<int, HashSet<uint>> ItemUnitIdsSeen = new Dictionary<int, HashSet<uint>>();
         public static Dictionary<int, HashSet<uint>> ItemUnitIdsToSkip = new Dictionary<int, HashSet<uint>>();
@@ -36,8 +18,10 @@ namespace MapAssist.Types
         public static Dictionary<int, Dictionary<uint, Npc>> ItemVendors = new Dictionary<int, Dictionary<uint, Npc>>();
         public static Dictionary<int, List<ItemLogEntry>> ItemLog = new Dictionary<int, List<ItemLogEntry>>();
         public static Dictionary<string, LocalizedObj> LocalizedItems = new Dictionary<string, LocalizedObj>();
+        public static Dictionary<ushort, LocalizedObj> LocalizedRunewords = new Dictionary<ushort, LocalizedObj>();
+        public static Dictionary<string, QualityLevelsObj> QualityLevels = new Dictionary<string, QualityLevelsObj>();
 
-        public static void LogItem(UnitItem item, int processId)
+        public static void LogItem(UnitItem item, Area area, int areaLevel, int playerLevel, int processId)
         {
             if (item.IsInStore)
             {
@@ -48,15 +32,20 @@ namespace MapAssist.Types
                 ItemUnitHashesSeen[processId].Add(item.HashString);
             }
 
-            if (item.IsPlayerOwned && item.IsIdentified)
+            ItemUnitIdsSeen[processId].Add(item.UnitId);
+
+            if (item.IsAnyPlayerHolding && item.IsIdentified)
             {
                 InventoryItemUnitIdsToSkip[processId].Add(item.UnitId);
                 ItemUnitIdsToSkip[processId].Add(item.UnitId);
+
+                if (!item.IsPlayerOwned)
+                {
+                    return;
+                }
             }
 
-            ItemUnitIdsSeen[processId].Add(item.UnitId);
-
-            var (logItem, rule) = LootFilter.Filter(item);
+            var (logItem, rule) = LootFilter.Filter(item, areaLevel, playerLevel);
             if (!logItem) return;
 
             if (MapAssistConfiguration.Loaded.ItemLog.PlaySoundOnDrop && (rule == null || rule.PlaySoundOnDrop))
@@ -66,13 +55,17 @@ namespace MapAssist.Types
 
             item.IsIdentifiedForLog = item.IsIdentified;
 
-            ItemLog[processId].Add(new ItemLogEntry()
+            var newLogEntry = new ItemLogEntry()
             {
-                Color = item.ItemBaseColor,
                 ItemHashString = item.HashString,
                 UnitItem = item,
-                Rule = rule
-            });
+                Rule = rule,
+                Area = area
+            };
+
+            ItemLog[processId].Add(newLogEntry);
+
+            _log.Info($"Added item to log: {newLogEntry.Text}");
         }
 
         public static bool CheckInventoryItem(UnitItem item, int processId) =>
@@ -112,7 +105,7 @@ namespace MapAssist.Types
 
             if (rule == null) return itemPrefix + itemBaseName;
 
-            if ((item.ItemData.ItemFlags & ItemFlags.IFLAG_ETHEREAL) == ItemFlags.IFLAG_ETHEREAL)
+            if (item.IsEthereal)
             {
                 itemPrefix += "[Eth] ";
             }
@@ -125,6 +118,15 @@ namespace MapAssist.Types
             if (item.ItemData.ItemQuality == ItemQuality.SUPERIOR)
             {
                 itemPrefix += "Sup. ";
+            }
+
+            if (rule.MinQualityLevel != null || rule.MaxQualityLevel != null)
+            {
+                var qualityLevel = GetQualityLevel(item);
+                if (qualityLevel != null)
+                {
+                    itemSuffix += $" (qlvl {qualityLevel})";
+                }
             }
 
             if (rule.AllResist != null)
@@ -179,7 +181,7 @@ namespace MapAssist.Types
                     {
                         foreach (var skillTree in skillTrees)
                         {
-                            itemSuffix += $" (+{points} {skillTree.Name()} skills)";
+                            itemSuffix += $" (+{points} {skillTree.Name().Replace(" Skills", "")} skills)";
                         }
                     }
                 }
@@ -287,6 +289,7 @@ namespace MapAssist.Types
                             itemFullName = foundFullUniqueName;
                         }
                         break;
+
                     case ItemQuality.SET:
                         if (_SetFromId.TryGetValue(item.ItemData.uniqueOrSetId, out var foundFullSetName))
                         {
@@ -297,7 +300,13 @@ namespace MapAssist.Types
             }
 
             var localizedName = GetItemNameFromKey(itemFullName);
-            if (localizedName == "ItemNotFound") return itemFullName;
+            if (localizedName == "ItemNotFound") localizedName = itemFullName;
+
+            if (item.IsRuneWord)
+            {
+                return GetRunewordFromId(item.Prefixes[0]) + " " + localizedName;
+            }
+
             return localizedName;
         }
 
@@ -305,6 +314,20 @@ namespace MapAssist.Types
         {
             LocalizedObj localItem;
             if (!LocalizedItems.TryGetValue(key, out localItem))
+            {
+                return "ItemNotFound";
+            }
+
+            var lang = MapAssistConfiguration.Loaded.LanguageCode;
+            var prop = localItem.GetType().GetProperty(lang.ToString()).GetValue(localItem, null);
+
+            return prop.ToString();
+        }
+
+        public static string GetRunewordFromId(ushort id)
+        {
+            LocalizedObj localItem;
+            if (!LocalizedRunewords.TryGetValue(id, out localItem))
             {
                 return "ItemNotFound";
             }
@@ -405,46 +428,40 @@ namespace MapAssist.Types
             return prop.ToString();
         }
 
-        public static Color GetItemBaseColor(UnitItem unit)
+        public static int? GetQualityLevel(UnitItem item)
         {
-            Color fontColor;
-            if (unit == null || !ItemColors.TryGetValue(unit.ItemData.ItemQuality, out fontColor))
+            string itemCode;
+            if (!_ItemCodes.TryGetValue(item.TxtFileNo, out itemCode))
             {
-                // Invalid item quality
-                return Color.Empty;
+                return null;
             }
 
-            var isEth = (unit.ItemData.ItemFlags & ItemFlags.IFLAG_ETHEREAL) == ItemFlags.IFLAG_ETHEREAL;
-            if (isEth && fontColor == Color.White)
+            string namedCode;
+            switch (item.ItemData.ItemQuality)
             {
-                return ItemColors[ItemQuality.SUPERIOR];
+                case ItemQuality.UNIQUE:
+                    if (_UniqueFromCode.TryGetValue(itemCode, out namedCode) && namedCode != "Unique")
+                    {
+                        itemCode = namedCode;
+                    }
+
+                    break;
+
+                case ItemQuality.SET:
+                    if (_SetFromCode.TryGetValue(itemCode, out namedCode) && namedCode != "Set")
+                    {
+                        itemCode = namedCode;
+                    }
+                    break;
             }
 
-            if (unit.Stats.ContainsKey(Stats.Stat.NumSockets) && fontColor == Color.White)
+            QualityLevelsObj qualityLevel;
+            if (!QualityLevels.TryGetValue(itemCode, out qualityLevel))
             {
-                return ItemColors[ItemQuality.SUPERIOR];
+                return null;
             }
 
-            if (unit.TxtFileNo >= 610 && unit.TxtFileNo <= 642)
-            {
-                // Runes
-                return ItemColors[ItemQuality.CRAFT];
-            }
-
-            switch (unit.TxtFileNo)
-            {
-                case 647: // Key of Terror
-                case 648: // Key of Hate
-                case 649: // Key of Destruction
-                case 653: // Token of Absolution
-                case 654: // Twisted Essence of Suffering
-                case 655: // Charged Essense of Hatred
-                case 656: // Burning Essence of Terror
-                case 657: // Festering Essence of Destruction
-                    return ItemColors[ItemQuality.CRAFT];
-            }
-
-            return fontColor;
+            return qualityLevel.qlvl;
         }
 
         public static ItemTier GetItemTier(UnitItem item)
@@ -460,7 +477,7 @@ namespace MapAssist.Types
             var itemClass = itemClasses.First();
             if (itemClass.Key == Item.ClassCirclets) return ItemTier.NotApplicable;
 
-            return (ItemTier)(Array.IndexOf(itemClass.Value, item) * 3 / itemClass.Value.Length); // All items with each class (except circlets) come in equal amounts within each tier
+            return (ItemTier)(Array.IndexOf(itemClass.Value, item) * 3 / itemClass.Value.Length); // All items within each class (except circlets) come in equal amounts within each tier
         }
 
         public static int GetItemStat(UnitItem item, Stats.Stat stat)
@@ -475,7 +492,8 @@ namespace MapAssist.Types
 
         public static double GetItemStatDecimal(UnitItem item, Stats.Stat stat)
         {
-            return item.Stats.TryGetValue(stat, out var statValue) && Stats.StatDivisors.TryGetValue(stat, out var divisor) ? statValue / divisor : 0;
+            return item.Stats.TryGetValue(stat, out var statValue) && Stats.StatDivisors.TryGetValue(stat, out var divisor) ? statValue / divisor :
+                Stats.StatInvertDivisors.TryGetValue(stat, out var invertDivisor) ? Math.Round(invertDivisor / statValue, 0) : 0;
         }
 
         public static int GetItemStatResists(UnitItem item, bool sumOfEach)
@@ -535,7 +553,7 @@ namespace MapAssist.Types
             return (new Structs.PlayerClass[] { playerClass }, allSkills);
         }
 
-        public static (SkillTree[], int) GetItemStatAddSkillTreeSkills(UnitItem item, SkillTree skillTree)
+        public static (SkillTree[], int) GetItemStatAddSkillTreeSkills(UnitItem item, SkillTree skillTree, bool addClassSkills = true)
         {
             if (skillTree == SkillTree.Any)
             {
@@ -547,7 +565,7 @@ namespace MapAssist.Types
                     if (item.StatLayers.TryGetValue(Stats.Stat.AddSkillTab, out var anyItemStats) &&
                         anyItemStats.TryGetValue((ushort)skillTreeId, out var anyTabSkills))
                     {
-                        anyTabSkills += GetItemStatAddClassSkills(item, skillTreeId.GetPlayerClass()).Item2; // This adds the +class skill points and +all skills points
+                        anyTabSkills += addClassSkills ? GetItemStatAddClassSkills(item, skillTreeId.GetPlayerClass()).Item2 : 0; // This adds the +class skill points and +all skills points
 
                         if (anyTabSkills > maxSkillTreeQuantity)
                         {
@@ -564,7 +582,7 @@ namespace MapAssist.Types
                 return (maxSkillTrees.ToArray(), maxSkillTreeQuantity);
             }
 
-            var baseAddSkills = GetItemStatAddClassSkills(item, skillTree.GetPlayerClass()).Item2; // This adds the +class skill points and +all skills points
+            var baseAddSkills = addClassSkills ? GetItemStatAddClassSkills(item, skillTree.GetPlayerClass()).Item2 : 0; // This adds the +class skill points and +all skills points
 
             if (item.StatLayers.TryGetValue(Stats.Stat.AddSkillTab, out var itemStats) &&
                 itemStats.TryGetValue((ushort)skillTree, out var addSkillTab))
@@ -575,7 +593,7 @@ namespace MapAssist.Types
             return (new SkillTree[] { skillTree }, baseAddSkills);
         }
 
-        public static (Skill[], int) GetItemStatAddSingleSkills(UnitItem item, Skill skill)
+        public static (Skill[], int) GetItemStatAddSingleSkills(UnitItem item, Skill skill, bool addSkillTree = true)
         {
             var itemSkillsStats = new List<Stats.Stat>()
             {
@@ -595,7 +613,7 @@ namespace MapAssist.Types
                         if (item.StatLayers.TryGetValue(statType, out var anyItemStats) &&
                             anyItemStats.TryGetValue((ushort)skillId, out var anySkillLevel))
                         {
-                            anySkillLevel += (statType == Stats.Stat.SingleSkill ? GetItemStatAddSkillTreeSkills(item, skillId.GetSkillTree()).Item2 : 0); // This adds the +skill tree points, +class skill points and +all skills points
+                            anySkillLevel += (addSkillTree && statType == Stats.Stat.SingleSkill ? GetItemStatAddSkillTreeSkills(item, skillId.GetSkillTree()).Item2 : 0); // This adds the +skill tree points, +class skill points and +all skills points
 
                             if (anySkillLevel > maxSkillQuantity)
                             {
@@ -613,7 +631,7 @@ namespace MapAssist.Types
                 return (maxSkills.ToArray(), maxSkillQuantity);
             }
 
-            var baseAddSkills = GetItemStatAddSkillTreeSkills(item, skill.GetSkillTree()).Item2; // This adds the +skill tree points, +class skill points and +all skills points
+            var baseAddSkills = addSkillTree ? GetItemStatAddSkillTreeSkills(item, skill.GetSkillTree()).Item2 : 0; // This adds the +skill tree points, +class skill points and +all skills points
 
             foreach (var statType in itemSkillsStats)
             {
@@ -647,18 +665,6 @@ namespace MapAssist.Types
             }
             return (0, 0, 0);
         }
-
-        public static readonly Dictionary<ItemQuality, Color> ItemColors = new Dictionary<ItemQuality, Color>()
-        {
-            {ItemQuality.INFERIOR, Color.White},
-            {ItemQuality.NORMAL, Color.White},
-            {ItemQuality.SUPERIOR, Color.Gray},
-            {ItemQuality.MAGIC, ColorTranslator.FromHtml("#4169E1")},
-            {ItemQuality.SET, ColorTranslator.FromHtml("#00FF00")},
-            {ItemQuality.RARE, ColorTranslator.FromHtml("#FFFF00")},
-            {ItemQuality.UNIQUE, ColorTranslator.FromHtml("#A59263")},
-            {ItemQuality.CRAFT, ColorTranslator.FromHtml("#FFAE00")},
-        };
 
         public static readonly Dictionary<uint, string> _SetFromId = new Dictionary<uint, string>()
         {
@@ -2370,12 +2376,12 @@ namespace MapAssist.Types
     public class ItemLogEntry
     {
         public string Text => Items.ItemLogDisplayName(UnitItem, Rule);
-        public Color Color { get; set; }
         public DateTime LogDate { get; private set; } = DateTime.Now;
         public bool ItemLogExpired => DateTime.Now.Subtract(LogDate).TotalSeconds > MapAssistConfiguration.Loaded.ItemLog.DisplayForSeconds;
         public string ItemHashString { get; set; }
         public UnitItem UnitItem { get; set; }
         public ItemFilter Rule { get; set; }
+        public Area Area { get; set; }
     }
 
     public static class ItemExtensions
@@ -2431,7 +2437,7 @@ namespace MapAssist.Types
         SET = 0x05, //0x05 Set
         RARE = 0x06, //0x06 Rare
         UNIQUE = 0x07, //0x07 Unique
-        CRAFT = 0x08, //0x08 Crafted
+        CRAFTED = 0x08, //0x08 Crafted
         TEMPERED = 0x09 //0x09 Tempered
     }
 

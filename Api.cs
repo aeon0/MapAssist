@@ -38,7 +38,6 @@ namespace MapAssist
         private GameDataReader _gameDataReader;
         private AreaData _areaData;
         private volatile GameData _gameData;
-        private List<PointOfInterest> _pointsOfInterest;
         private string _currentArea = "";
         private int _currentMapHeight = 0;
         private int _currentMapWidth = 0;
@@ -88,9 +87,9 @@ namespace MapAssist
                                 forceMap = true;
                                 // Console.WriteLine("Force Map update");
                             }
-                            
-                            (_gameData, _areaData, _pointsOfInterest, _) = _gameDataReader.Get();
-                            if (_gameData != null && _areaData != null && _pointsOfInterest != null)
+
+                            (_gameData, _areaData, _) = _gameDataReader.Get();
+                            if (_gameData != null && _areaData != null)
                             {
                                 // Figure out if we should update collison grid or not
                                 var current_area = _areaData.Area.ToString();
@@ -142,7 +141,7 @@ namespace MapAssist
                                     });
                                 }
 
-                                foreach (PointOfInterest p in _pointsOfInterest)
+                                foreach (PointOfInterest p in _areaData.PointsOfInterest)
                                 {
                                     msg.points_of_interest.Add(new
                                     {

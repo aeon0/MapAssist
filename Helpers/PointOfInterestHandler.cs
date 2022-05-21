@@ -1,28 +1,8 @@
-﻿/**
- *   Copyright (C) 2021 okaygo
- *
- *   https://github.com/misterokaygo/MapAssist/
- *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
- **/
-
-using GameOverlay.Drawing;
+﻿using GameOverlay.Drawing;
 using MapAssist.Settings;
 using MapAssist.Types;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace MapAssist.Helpers
 {
@@ -120,6 +100,35 @@ namespace MapAssist.Helpers
             GameObject.JungleShrine5,
         };
 
+        private static readonly HashSet<GameObject> Doors = new HashSet<GameObject>
+        {
+            GameObject.DoorCathedralLeft,
+            GameObject.DoorCathedralRight,
+            GameObject.DoorCourtyardLeft,
+            GameObject.DoorCourtyardRight,
+            GameObject.DoorGateLeft,
+            GameObject.DoorGateRight,
+            GameObject.DoorMonasteryDoubleRight,
+            GameObject.DoorWoodenLeft,
+            GameObject.DoorWoodenLeft2,
+            GameObject.DoorWoodenRight,
+            GameObject.IronGrateDoorLeft,
+            GameObject.IronGrateDoorRight,
+            GameObject.SlimeDoor1,
+            GameObject.SlimeDoor2,
+            GameObject.TombDoorLeft,
+            GameObject.TombDoorLeft2,
+            GameObject.TombDoorRight,
+            GameObject.TombDoorRight2,
+            GameObject.WoodenDoorLeft,
+            GameObject.WoodenDoorRight,
+            GameObject.WoodenGrateDoorLeft,
+            GameObject.WoodenGrateDoorRight,
+            GameObject.AndarielDoor,
+            GameObject.PenBreakableDoor,
+            GameObject.SecretDoor1
+        };
+
         public static void UpdateLocalizationNames()
         {
             QuestObjects = new Dictionary<GameObject, string>
@@ -161,25 +170,6 @@ namespace MapAssist.Helpers
 
         public static List<PointOfInterest> Get(MapApi mapApi, AreaData areaData, GameData gameData)
         {
-            var pointsOfInterest = GetArea(mapApi, areaData, gameData);
-
-            if (AreaExtensions.RequiresStitching(areaData.Area))
-            {
-                foreach (var adjacentArea in areaData.AdjacentAreas.Values.ToList())
-                {
-                    if (AreaExtensions.RequiresStitching(adjacentArea.Area))
-                    {
-                        var adjacentPoi = GetArea(mapApi, adjacentArea, gameData).Where(a => !pointsOfInterest.Any(b => a.Position.Subtract(b.Position).Length() < 5)).ToList(); // Prevent poi in an adjacent area from overlapping with poi in the current area
-                        pointsOfInterest.AddRange(adjacentPoi);
-                    }
-                }
-            }
-
-            return pointsOfInterest;
-        }
-
-        public static List<PointOfInterest> GetArea(MapApi mapApi, AreaData areaData, GameData gameData)
-        {
             var pointsOfInterest = new List<PointOfInterest>();
             var areaRenderDecided = new List<Area>();
 
@@ -199,14 +189,15 @@ namespace MapAssist.Helpers
                         Area.TalRashasTomb5, Area.TalRashasTomb6, Area.TalRashasTomb7
                     };
                     var realTomb = Area.None;
-                    Parallel.ForEach(tombs, tombArea =>
+                    foreach (var tombArea in tombs)
                     {
                         AreaData tombData = mapApi.GetMapData(tombArea);
                         if (tombData.Objects.ContainsKey(GameObject.HoradricOrifice))
                         {
                             realTomb = tombArea;
+                            break;
                         }
-                    });
+                    }
 
                     if (realTomb != Area.None && areaData.AdjacentLevels[realTomb].Exits.Any())
                     {
@@ -383,7 +374,7 @@ namespace MapAssist.Helpers
                 else if (areaData.Area == Area.Barracks)
                 {
                     var outerCloisterArea = mapApi.GetMapData(Area.OuterCloister);
-                    var barracksAreaData = GetArea(mapApi, outerCloisterArea, gameData);
+                    var barracksAreaData = Get(mapApi, outerCloisterArea, gameData);
                     var barracks = barracksAreaData.FirstOrDefault(poi => poi.Type == PoiType.NextArea);
 
                     pointsOfInterest.Add(new PointOfInterest
@@ -517,7 +508,7 @@ namespace MapAssist.Helpers
                         pointsOfInterest.Add(new PointOfInterest
                         {
                             Area = areaData.Area,
-                            Label = obj.ToString(),
+                            Label = "",
                             Position = point,
                             RenderingSettings = MapAssistConfiguration.Loaded.MapConfiguration.Shrine,
                             Type = PoiType.Shrine
@@ -554,6 +545,20 @@ namespace MapAssist.Helpers
                         });
                     }
                 }
+                else if (Doors.Contains(obj))
+                {
+                    foreach (var point in points)
+                    {
+                        pointsOfInterest.Add(new PointOfInterest
+                        {
+                            Area = areaData.Area,
+                            Label = obj.ToString(),
+                            Position = point,
+                            RenderingSettings = MapAssistConfiguration.Loaded.MapConfiguration.Door,
+                            Type = PoiType.Door
+                        });
+                    }
+                }
             }
 
             switch (areaData.Area)
@@ -572,7 +577,7 @@ namespace MapAssist.Helpers
                     break;
             }
 
-            return pointsOfInterest;
+            return pointsOfInterest.Where(poi => poi.Area == areaData.Area).ToList();
         }
     }
 }
