@@ -70,7 +70,7 @@ namespace MapAssist.Types
 
         public static bool CheckInventoryItem(UnitItem item, int processId) =>
             MapAssistConfiguration.Loaded.ItemLog.CheckItemOnIdentify &&
-            item.IsIdentified && item.IsPlayerOwned && !item.IsInSocket &&
+            item.IsIdentified && item.IsPlayerOwned && item.IsInInventory &&
             !InventoryItemUnitIdsToSkip[processId].Contains(item.UnitId);
 
         public static bool CheckDroppedItem(UnitItem item, int processId) =>
@@ -482,7 +482,9 @@ namespace MapAssist.Types
 
         public static int GetItemStat(UnitItem item, Stats.Stat stat)
         {
-            return item.Stats.TryGetValue(stat, out var statValue) ? statValue : 0;
+            return item.Stats.TryGetValue(stat, out var statValue) ? statValue :
+                item.StatsAdded != null && item.StatsAdded.TryGetValue(stat, out var statAddedValue) ? statAddedValue :
+                item.StaffMods != null && item.StaffMods.TryGetValue(stat, out var staffModValue) ? staffModValue : 0;
         }
 
         public static int GetItemStatShifted(UnitItem item, Stats.Stat stat)
