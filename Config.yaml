@@ -11,7 +11,7 @@ HiddenAreas:
 AuthorizedWindowTitles: []
 RenderingConfiguration:
   Opacity: 0.3
-  IconOpacity: 0.4
+  IconOpacity: 0.9
   OverlayMode: true
   Position: Center
   MonsterHealthBar: true
